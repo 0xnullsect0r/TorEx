@@ -8,6 +8,7 @@ RUN --mount=type=cache,id=apk-tor,target=/var/cache/apk \
     && apk update \
     && apk add \
         tor \
+        libsodium \
         build-base \
         autoconf \
         automake \
