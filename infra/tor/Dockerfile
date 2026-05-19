@@ -3,7 +3,7 @@ FROM alpine:3.21
 
 # Alpine base image has no ca-certificates, so HTTPS to external repos fails
 # from inside Docker. HTTP is safe: apk verifies packages via GPG signing keys.
-RUN --mount=type=cache,target=/var/cache/apk \
+RUN --mount=type=cache,id=apk-tor,target=/var/cache/apk \
     printf 'http://dl-cdn.alpinelinux.org/alpine/v3.21/main\nhttp://dl-cdn.alpinelinux.org/alpine/v3.21/community\n' > /etc/apk/repositories \
     && apk update \
     && apk add \
