@@ -1,0 +1,55 @@
+[package]
+name = "torex-frontend"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "torex-frontend"
+path = "src/main.rs"
+
+[dependencies]
+leptos = { version = "0.7", features = ["csr"] }
+leptos_router = { version = "0.7", features = ["browser"] }
+
+gloo-net = { version = "0.6", features = ["http", "websocket"] }
+gloo-storage = "0.3"
+gloo-timers = { version = "0.3", features = ["futures"] }
+futures-util = "0.3"
+
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+  "Window",
+  "Location",
+  "Navigator",
+  "Clipboard",
+  "HtmlInputElement",
+  "HtmlSelectElement",
+  "console",
+] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# WASM-safe randomness — must be declared before all crypto crates
+getrandom = { version = "0.2", features = ["js"] }
+rand = { version = "0.8", features = ["getrandom"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+# Crypto
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+x25519-dalek  = { version = "2", features = ["static_secrets"] }
+snow          = { version = "0.9", default-features = false, features = ["default-resolver"] }
+aes-gcm       = "0.10"
+bip39         = "2"
+hex           = "0.4"
+base64        = "0.22"
+hmac          = "0.12"
+sha2          = "0.10"
+blake2        = "0.10"
+
+[profile.release]
+opt-level     = "s"
+lto           = true
+codegen-units = 1

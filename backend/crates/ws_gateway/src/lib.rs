@@ -13,7 +13,6 @@ use crypto_primitives::{
 };
 use futures_util::{SinkExt, StreamExt};
 use matching::{OrderBooks, subscribe_trades, subscribe_user};
-use rand::RngCore;
 use redis::aio::ConnectionManager;
 use serde::Deserialize;
 use tokio::{sync::Mutex, time::interval};
@@ -55,9 +54,13 @@ async fn handle_socket(stream: axum::extract::ws::WebSocket, session_id: Option<
     };
     let Some(transport) = transport else { return; };
     let remote = transport.remote_static_pubkey().unwrap_or([9_u8; 32].to_vec());
-    let mut local_bytes = [0_u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut local_bytes);
-    let local_secret = x25519_dalek::StaticSecret::from(local_bytes);
+    // Use the server's Noise static private key for Signal ratchet so the client can
+    // derive the same root via ECDH: DH(server_noise_priv, client_noise_pub) ==
+    // DH(client_noise_priv, server_noise_pub).
+    let server_static = server_static_keypair();
+    let local_secret = x25519_dalek::StaticSecret::from(
+        <[u8; 32]>::try_from(&server_static[..32]).unwrap_or([9_u8; 32]),
+    );
     let remote_bytes: [u8; 32] = remote[..32].try_into().unwrap_or([9_u8; 32]);
     let remote_pub = x25519_dalek::PublicKey::from(remote_bytes);
     let ratchet = Arc::new(Mutex::new(RatchetSession::init_receiver(&local_secret, &remote_pub)));

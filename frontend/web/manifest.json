@@ -1,9 +1,0 @@
-{
-  "name": "TorEx",
-  "short_name": "TorEx",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#0D0D0F",
-  "theme_color": "#7B61FF",
-  "description": "TorEx — Privacy-first USDT exchange"
-}
