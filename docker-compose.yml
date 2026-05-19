@@ -8,7 +8,6 @@ networks:
 volumes:
   postgres_data:
   kafka_data:
-  vault_data:
   tor_data:
   grafana_data:
   loki_data:
@@ -66,7 +65,9 @@ services:
       kafka:
         condition: service_healthy
       vault:
-        condition: service_healthy
+        condition: service_started
+      vault-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
@@ -139,21 +140,39 @@ services:
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN}
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
-      VAULT_ADDR: http://127.0.0.1:8200
     cap_add:
       - IPC_LOCK
-    volumes:
-      - vault_data:/vault/data
-      - ./infra/vault/config.hcl:/vault/config/config.hcl:ro
     command: vault server -dev -dev-root-token-id=${VAULT_TOKEN}
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ["CMD-SHELL", "VAULT_ADDR=http://127.0.0.1:8200 vault status; ret=$?; [ $ret -eq 0 ] || [ $ret -eq 2 ]"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health?sealedok=true"]
       interval: 5s
       timeout: 5s
-      retries: 15
-      start_period: 10s
+      retries: 20
+      start_period: 5s
+
+  vault-init:
+    image: hashicorp/vault:1.17
+    networks:
+      - internal
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN}
+      BALANCE_ENC_KEY: ${BALANCE_ENC_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      HOT_WALLET_ETH_KEY: ${HOT_WALLET_ETH_KEY:-}
+      HOT_WALLET_TRON_KEY: ${HOT_WALLET_TRON_KEY:-}
+    depends_on:
+      vault:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        vault kv put secret/torex balance_enc_key="$$BALANCE_ENC_KEY"
+        vault kv put secret/torex-hot-wallet eth_key="$$HOT_WALLET_ETH_KEY" tron_key="$$HOT_WALLET_TRON_KEY"
+        echo "Vault secrets seeded."
+    restart: "no"
+    logging: *default-logging
 
   tor:
     build:
