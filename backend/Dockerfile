@@ -11,6 +11,7 @@ RUN apk add --no-cache \
     musl-dev \
     zlib-dev \
     zlib-static \
+    curl-dev \
     build-base
 WORKDIR /app
 

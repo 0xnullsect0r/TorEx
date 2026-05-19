@@ -67,8 +67,7 @@ import 'package:flutter/material.dart';
                   const Padding(
                     padding: EdgeInsets.all(16),
                     child: Text(
-                      'TorEx v1.0.0
-Privacy-first exchange. No PII. No email.',
+                      'TorEx v1.0.0\nPrivacy-first exchange. No PII. No email.',
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                     ),
                   ),
