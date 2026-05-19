@@ -14,7 +14,8 @@ x-logging: &default-logging
 services:
   nginx:
     build:
-      context: ./nginx
+      context: .
+      dockerfile: nginx/Dockerfile
       network: host
     network_mode: host
     depends_on:
