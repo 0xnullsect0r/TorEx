@@ -180,9 +180,7 @@ services:
     build:
       context: ./infra/tor
       network: host
-    networks:
-      - internal
-      - external_facing
+    network_mode: host
     volumes:
       - tor_data:/var/lib/tor
     depends_on:

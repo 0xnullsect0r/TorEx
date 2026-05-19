@@ -1,5 +1,5 @@
 DataDirectory /var/lib/tor
 HiddenServiceDir /var/lib/tor/hidden_service
-HiddenServicePort 80 nginx:80
+HiddenServicePort 80 127.0.0.1:80
 HiddenServiceVersion 3
 Log notice stderr
