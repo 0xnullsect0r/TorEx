@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
 
-# Alpine-based cargo-chef: native musl target, no apt-get needed
 FROM lukemathwalker/cargo-chef:latest-rust-1-alpine AS chef
-RUN apk add --no-cache \
+# Split apk update into its own layer so Docker's layer cache preserves the APKINDEX.
+# Subsequent builds reuse this cached layer without hitting the network.
+RUN apk update
+RUN apk add \
     pkgconfig \
     openssl-dev \
     openssl-libs-static \
@@ -27,9 +29,11 @@ COPY . .
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin torex
 
-# Minimal Alpine runtime with CA certs for TLS
-FROM alpine:3.19 AS runtime
-RUN apk add --no-cache ca-certificates
+# Runtime: alpine:3.21 with split apk layers (same resilience pattern as build stage).
+# apk update is its own cached layer — the APKINDEX is never re-fetched on rebuild.
+FROM alpine:3.21 AS runtime
+RUN apk update
+RUN apk add ca-certificates
 COPY --from=builder /app/target/release/torex /torex
 EXPOSE 8080
 ENTRYPOINT ["/torex"]

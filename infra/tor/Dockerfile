@@ -1,9 +1,8 @@
 FROM alpine:3.21
 
-# Separate apk update so its layer is cached; avoids re-downloading APKINDEX on retry
+# Split apk update into its own layer so Docker's layer cache preserves the APKINDEX.
+# Subsequent builds reuse this cached layer without hitting the network.
 RUN apk update
-
-# Install tor + build deps (uses cached index from previous layer)
 RUN apk add \
     tor \
     build-base \
@@ -12,7 +11,7 @@ RUN apk add \
     libsodium-dev \
     git
 
-# Build mkp224o, strip build deps, clean cache
+# Build mkp224o then remove build tools (separate layer so mkp224o build is cached)
 RUN git clone --depth=1 https://github.com/cathugger/mkp224o /tmp/mkp224o \
     && cd /tmp/mkp224o \
     && ./autogen.sh \
@@ -21,8 +20,7 @@ RUN git clone --depth=1 https://github.com/cathugger/mkp224o /tmp/mkp224o \
     && strip mkp224o \
     && cp mkp224o /usr/local/bin/mkp224o \
     && rm -rf /tmp/mkp224o \
-    && apk del build-base autoconf automake libsodium-dev git \
-    && rm -rf /var/cache/apk/*
+    && apk del build-base autoconf automake libsodium-dev git
 
 COPY torrc /etc/tor/torrc
 COPY entrypoint.sh /entrypoint.sh
