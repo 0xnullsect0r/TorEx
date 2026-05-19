@@ -1,21 +1,14 @@
 # syntax=docker/dockerfile:1
 
 FROM lukemathwalker/cargo-chef:latest-rust-1-alpine AS chef
-# dl-cdn.alpinelinux.org can be unreliable. Try non-CDN mirrors in order.
-# Extract Alpine version from existing repos file so we don't hardcode it.
-# BuildKit cache mount persists the APKINDEX across builds once fetched.
+# Alpine base image has no ca-certificates, so HTTPS to external repos fails
+# inside Docker. Switch to HTTP (packages are still GPG-verified by apk).
+# Extract the Alpine version already set in the image's repos file.
 RUN --mount=type=cache,target=/var/cache/apk \
     ALPINE_VER=$(grep -oE 'v[0-9]+\.[0-9]+' /etc/apk/repositories | head -1) \
-    && for MIRROR in \
-        "https://mirrors.edge.kernel.org/alpine" \
-        "https://dl-4.alpinelinux.org/alpine" \
-        "https://dl-cdn.alpinelinux.org/alpine"; \
-    do \
-        printf '%s/%s/main\n%s/%s/community\n' "$MIRROR" "$ALPINE_VER" "$MIRROR" "$ALPINE_VER" > /etc/apk/repositories \
-        && apk update \
-        && break \
-        || echo "Mirror $MIRROR failed, trying next..."; \
-    done \
+    && printf 'http://dl-cdn.alpinelinux.org/alpine/%s/main\nhttp://dl-cdn.alpinelinux.org/alpine/%s/community\n' \
+        "$ALPINE_VER" "$ALPINE_VER" > /etc/apk/repositories \
+    && apk update \
     && apk add \
         pkgconfig \
         openssl-dev \
@@ -41,19 +34,11 @@ COPY . .
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin torex
 
-# Runtime: alpine:3.21 with non-CDN mirror fallback + BuildKit cache.
+# Runtime: alpine:3.21 — use HTTP repos (no ca-certs in base image → HTTPS fails).
 FROM alpine:3.21 AS runtime
 RUN --mount=type=cache,target=/var/cache/apk \
-    for MIRROR in \
-        "https://mirrors.edge.kernel.org/alpine" \
-        "https://dl-4.alpinelinux.org/alpine" \
-        "https://dl-cdn.alpinelinux.org/alpine"; \
-    do \
-        printf '%s/v3.21/main\n%s/v3.21/community\n' "$MIRROR" "$MIRROR" > /etc/apk/repositories \
-        && apk update \
-        && break \
-        || echo "Mirror $MIRROR failed, trying next..."; \
-    done \
+    printf 'http://dl-cdn.alpinelinux.org/alpine/v3.21/main\nhttp://dl-cdn.alpinelinux.org/alpine/v3.21/community\n' > /etc/apk/repositories \
+    && apk update \
     && apk add ca-certificates
 COPY --from=builder /app/target/release/torex /torex
 EXPOSE 8080

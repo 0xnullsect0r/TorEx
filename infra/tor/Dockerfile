@@ -1,20 +1,11 @@
 # syntax=docker/dockerfile:1
 FROM alpine:3.21
 
-# dl-cdn.alpinelinux.org is geo-routed and can be unreliable on some servers.
-# Try non-CDN mirrors in order: kernel.org → official dl-4 → CDN fallback.
-# BuildKit cache mount persists the APKINDEX across builds once fetched.
+# Alpine base image has no ca-certificates, so HTTPS to external repos fails
+# from inside Docker. HTTP is safe: apk verifies packages via GPG signing keys.
 RUN --mount=type=cache,target=/var/cache/apk \
-    for MIRROR in \
-        "https://mirrors.edge.kernel.org/alpine" \
-        "https://dl-4.alpinelinux.org/alpine" \
-        "https://dl-cdn.alpinelinux.org/alpine"; \
-    do \
-        printf '%s/v3.21/main\n%s/v3.21/community\n' "$MIRROR" "$MIRROR" > /etc/apk/repositories \
-        && apk update \
-        && break \
-        || echo "Mirror $MIRROR failed, trying next..."; \
-    done \
+    printf 'http://dl-cdn.alpinelinux.org/alpine/v3.21/main\nhttp://dl-cdn.alpinelinux.org/alpine/v3.21/community\n' > /etc/apk/repositories \
+    && apk update \
     && apk add \
         tor \
         build-base \
