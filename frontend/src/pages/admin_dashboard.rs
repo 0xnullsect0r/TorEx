@@ -1,7 +1,6 @@
-use leptos::*;
-use leptos_router::use_navigate;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use serde_json::{json, Value};
-use wasm_bindgen_futures::spawn_local;
 
 use crate::core::{api, storage, types::{AdminStats, FeeTier, Withdrawal}};
 
@@ -13,7 +12,7 @@ pub fn AdminDashboard() -> impl IntoView {
     let (active_tab, set_active_tab) = create_signal("stats");
     let navigate = use_navigate();
 
-    let refresh_stats = create_action(move |_: &()| async move {
+    let refresh_stats = Action::new_local(move |_: &()| async move {
         if let Ok(v) = api::admin_get("/admin/api/stats").await {
             if let Ok(s) = serde_json::from_value::<AdminStats>(v) {
                 set_stats.set(Some(s));
@@ -21,7 +20,7 @@ pub fn AdminDashboard() -> impl IntoView {
         }
     });
 
-    let refresh_fees = create_action(move |_: &()| async move {
+    let refresh_fees = Action::new_local(move |_: &()| async move {
         if let Ok(v) = api::admin_get("/admin/api/fees").await {
             if let Some(arr) = v.as_array() {
                 if let Ok(tiers) = serde_json::from_value::<Vec<FeeTier>>(Value::Array(arr.clone())) {
@@ -31,7 +30,7 @@ pub fn AdminDashboard() -> impl IntoView {
         }
     });
 
-    let refresh_withdrawals = create_action(move |_: &()| async move {
+    let refresh_withdrawals = Action::new_local(move |_: &()| async move {
         if let Ok(v) = api::admin_get("/admin/api/withdrawals?status=pending").await {
             if let Some(arr) = v["withdrawals"].as_array() {
                 if let Ok(ws) = serde_json::from_value::<Vec<Withdrawal>>(Value::Array(arr.clone())) {
@@ -41,13 +40,13 @@ pub fn AdminDashboard() -> impl IntoView {
         }
     });
 
-    let approve_withdrawal = create_action(move |id: &String| {
+    let approve_withdrawal = Action::new_local(move |id: &String| {
         let id = id.clone();
         let rw = refresh_withdrawals.clone();
         async move {
             let body = json!({ "action": "approve" });
             let _ = api::admin_put(&format!("/admin/api/withdrawals/{id}"), &body).await;
-            rw.dispatch(());
+            rw.dispatch_local(());
         }
     });
 
@@ -57,10 +56,10 @@ pub fn AdminDashboard() -> impl IntoView {
     };
 
     // Load on mount
-    create_effect(move |_| {
-        refresh_stats.dispatch(());
-        refresh_fees.dispatch(());
-        refresh_withdrawals.dispatch(());
+    Effect::new(move || {
+        refresh_stats.dispatch_local(());
+        refresh_fees.dispatch_local(());
+        refresh_withdrawals.dispatch_local(());
     });
 
     view! {
@@ -95,9 +94,9 @@ pub fn AdminDashboard() -> impl IntoView {
                         <StatCard label="Open Orders"     value=s.open_orders.to_string()/>
                         <StatCard label="Pending W/D"     value=s.pending_withdrawals.to_string()/>
                     </div>
-                }).unwrap_or_else(|| view! {
+                }.into_any()).unwrap_or_else(|| view! {
                     <div class="text-muted">"Loading…"</div>
-                })}
+                }.into_any())}
             </Show>
 
             // Fee tiers
@@ -147,8 +146,8 @@ pub fn AdminDashboard() -> impl IntoView {
                                 let w_amount = format!("{:.2}", w.amount);
                                 let w_chain = w.chain.clone();
                                 let w_dest = w.dest_address.clone();
-                                let w_status = w.status.clone();
-                                let w_status2 = w.status.clone();
+                                let is_pending = w.status == "pending";
+                                let w_status = w.status;
                                 view! {
                                     <tr>
                                         <td style="font-size:10px;">{w_id_short}"…"</td>
@@ -157,15 +156,19 @@ pub fn AdminDashboard() -> impl IntoView {
                                         <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;">
                                             {w_dest}
                                         </td>
-                                        <td>{w_status.clone()}</td>
+                                        <td>{w_status}</td>
                                         <td>
-                                            <Show when=move || w_status2=="pending">
-                                                <button class="btn-primary"
-                                                    style="padding:2px 8px;font-size:11px;"
-                                                    on:click=move |_| approve_withdrawal.dispatch(wid.clone())>
-                                                    "Approve"
-                                                </button>
-                                            </Show>
+                                            {if is_pending {
+                                                view! {
+                                                    <button class="btn-primary"
+                                                        style="padding:2px 8px;font-size:11px;"
+                                                        on:click=move |_| { approve_withdrawal.dispatch_local(wid.clone()); }>
+                                                        "Approve"
+                                                    </button>
+                                                }.into_any()
+                                            } else {
+                                                ().into_any()
+                                            }}
                                         </td>
                                     </tr>
                                 }

@@ -1,5 +1,5 @@
-use leptos::*;
-use leptos_router::A;
+use leptos::prelude::*;
+use leptos_router::components::A;
 
 const PAIRS: &[&str] = &[
     "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT",

@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::prelude::*;
 
 use crate::components::{chart::Chart, nav::Nav, order_book::OrderBook, order_entry::OrderEntry};
 use crate::core::{api, types::Order, ws};
@@ -17,20 +17,18 @@ pub fn Trading() -> impl IntoView {
     let (open_orders, set_open_orders) = create_signal(Vec::<Order>::new());
 
     // WebSocket handle — reconnects when pair changes
-    let initial_handle = ws::connect(pair.get());
+    let initial_handle = ws::connect(pair.get_untracked());
     let (ws_ob, set_ws_ob) = create_signal(initial_handle.orderbook);
     let (ws_trades, set_ws_trades) = create_signal(initial_handle.trades);
-    create_effect(move |prev_pair: Option<String>| {
+    Effect::new(move || {
         let p = pair.get();
-        if prev_pair.as_deref() == Some(&p) { return p; }
         let h = ws::connect(p.clone());
         set_ws_ob.set(h.orderbook);
         set_ws_trades.set(h.trades);
-        p
     });
 
     // Load open orders
-    let fetch_orders = create_action(move |_: &()| async move {
+    let fetch_orders = Action::new_local(move |_: &()| async move {
         match api::get("/api/orders").await {
             Ok(v) => {
                 if let Ok(orders) =
@@ -42,15 +40,15 @@ pub fn Trading() -> impl IntoView {
             Err(_) => {}
         }
     });
-    fetch_orders.dispatch(());
+    fetch_orders.dispatch_local(());
 
     // Cancel order
-    let cancel = create_action(move |id: &String| {
+    let cancel = Action::new_local(move |id: &String| {
         let id = id.clone();
         let fetch = fetch_orders.clone();
         async move {
             let _ = api::delete(&format!("/api/orders/{id}")).await;
-            fetch.dispatch(());
+            fetch.dispatch_local(());
         }
     });
 
@@ -70,8 +68,7 @@ pub fn Trading() -> impl IntoView {
 
             // Order entry
             <div class="entry-panel card">
-                <OrderEntry pair=pair on_placed=Callback::new(move |_| fetch_orders.dispatch(()))/>
-            </div>
+                <OrderEntry pair=pair on_placed=UnsyncCallback::new(move |_: ()| { fetch_orders.dispatch_local(()); })/>            </div>
 
             // Open orders
             <div class="orders-area card" style="overflow:auto;">
@@ -102,7 +99,7 @@ pub fn Trading() -> impl IntoView {
                                         <td>
                                             <button
                                                 style="background:none;border:none;color:var(--sell);cursor:pointer;"
-                                                on:click=move |_| cancel.dispatch(oid.clone())
+                                                on:click=move |_| { cancel.dispatch_local(oid.clone()); }
                                             >"×"</button>
                                         </td>
                                     </tr>

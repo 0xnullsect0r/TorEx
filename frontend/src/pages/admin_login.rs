@@ -1,5 +1,5 @@
-use leptos::*;
-use leptos_router::use_navigate;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use serde_json::json;
 use wasm_bindgen::JsCast;
 use web_sys::{window, HtmlInputElement};

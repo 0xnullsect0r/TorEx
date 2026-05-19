@@ -1,6 +1,5 @@
-use leptos::*;
-use leptos_router::use_navigate;
-use serde_json::json;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 
 use crate::core::{api, crypto, storage};
 
@@ -15,48 +14,52 @@ pub fn Onboarding() -> impl IntoView {
 
     let navigate = use_navigate();
 
-    let register = move |mnemonic: String| {
-        if !crypto::validate_mnemonic(&mnemonic) {
-            set_error.set(Some("Invalid recovery phrase".into()));
-            return;
-        }
-        let Some(keys) = crypto::keys_from_mnemonic(&mnemonic) else {
-            set_error.set(Some("Key derivation failed".into()));
-            return;
-        };
-        let nav = navigate.clone();
-        set_loading.set(true);
-        set_error.set(None);
-
-        let pubkey_bytes: [u8; 32] = hex::decode(&keys.pubkey_hex)
-            .ok()
-            .and_then(|b| b.try_into().ok())
-            .unwrap_or([0u8; 32]);
-        let (sig_hex, timestamp) = crypto::sign_registration(&keys.signing_key, &pubkey_bytes);
-
-        wasm_bindgen_futures::spawn_local(async move {
-            let body = json!({
-                "pubkey":       keys.pubkey_hex,
-                "view_pubkey":  keys.view_pubkey_hex,
-                "spend_pubkey": keys.spend_pubkey_hex,
-                "signature":    sig_hex,
-                "timestamp":    timestamp,
-            });
-            match api::post_json("/api/auth/register", &body).await {
-                Ok(resp) => {
-                    if let Some(sid) = resp["session_id"].as_str() {
-                        storage::set_session_id(sid);
-                        storage::set_mnemonic(&mnemonic);
-                        nav("/trading", Default::default());
-                    } else {
-                        set_error.set(Some("No session_id in response".into()));
-                    }
+    let register = Action::new_local({
+        let navigate = navigate.clone();
+        move |mnemonic: &String| {
+            let mnemonic = mnemonic.clone();
+            let navigate = navigate.clone();
+            async move {
+                if !crypto::validate_mnemonic(&mnemonic) {
+                    set_error.set(Some("Invalid recovery phrase".into()));
+                    return;
                 }
-                Err(e) => set_error.set(Some(e)),
+                let Some(keys) = crypto::keys_from_mnemonic(&mnemonic) else {
+                    set_error.set(Some("Key derivation failed".into()));
+                    return;
+                };
+                set_loading.set(true);
+                set_error.set(None);
+
+                let pubkey_bytes: [u8; 32] = hex::decode(&keys.pubkey_hex)
+                    .ok()
+                    .and_then(|b| b.try_into().ok())
+                    .unwrap_or([0u8; 32]);
+                let (sig_hex, timestamp) = crypto::sign_registration(&keys.signing_key, &pubkey_bytes);
+
+                let body = serde_json::json!({
+                    "pubkey":       keys.pubkey_hex,
+                    "view_pubkey":  keys.view_pubkey_hex,
+                    "spend_pubkey": keys.spend_pubkey_hex,
+                    "signature":    sig_hex,
+                    "timestamp":    timestamp,
+                });
+                match api::post_json("/api/auth/register", &body).await {
+                    Ok(resp) => {
+                        if let Some(sid) = resp["session_id"].as_str() {
+                            storage::set_session_id(sid);
+                            storage::set_mnemonic(&mnemonic);
+                            navigate("/trading", Default::default());
+                        } else {
+                            set_error.set(Some("No session_id in response".into()));
+                        }
+                    }
+                    Err(e) => set_error.set(Some(e)),
+                }
+                set_loading.set(false);
             }
-            set_loading.set(false);
-        });
-    };
+        }
+    });
 
     view! {
         <div class="center-page">
@@ -87,7 +90,7 @@ pub fn Onboarding() -> impl IntoView {
                     <button
                         class="btn-primary mt-16"
                         disabled=move || !confirmed.get() || loading.get()
-                        on:click=move |_| register(generated.get())
+                        on:click=move |_| { register.dispatch_local(generated.get()); }
                     >
                         {move || if loading.get() { "Creating…" } else { "Create Wallet" }}
                     </button>
@@ -114,7 +117,7 @@ pub fn Onboarding() -> impl IntoView {
                     <button
                         class="btn-primary"
                         disabled=move || loading.get()
-                        on:click=move |_| register(import_val.get().trim().to_string())
+                        on:click=move |_| { register.dispatch_local(import_val.get().trim().to_string()); }
                     >
                         {move || if loading.get() { "Importing…" } else { "Import Wallet" }}
                     </button>

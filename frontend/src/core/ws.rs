@@ -17,7 +17,7 @@ use aes_gcm::{
 use futures_util::{SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message};
 use hmac::{Hmac, Mac};
-use leptos::*;
+use leptos::prelude::*;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -33,23 +33,23 @@ type HmacSha256 = Hmac<Sha256>;
 // ──────────────────────────────────────────────────────────────────────────
 
 fn kdf_chain(chain_key: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
-    let mut mac = HmacSha256::new_from_slice(chain_key).expect("hmac");
+    let mut mac = <HmacSha256 as KeyInit>::new_from_slice(chain_key).expect("hmac");
     mac.update(&[1u8]);
     let next: [u8; 32] = mac.finalize().into_bytes().into();
-    let mut mac2 = HmacSha256::new_from_slice(chain_key).expect("hmac");
+    let mut mac2 = <HmacSha256 as KeyInit>::new_from_slice(chain_key).expect("hmac");
     mac2.update(&[2u8]);
     let msg: [u8; 32] = mac2.finalize().into_bytes().into();
     (next, msg)
 }
 
 fn derive_label(root: &[u8; 32], label: &[u8]) -> [u8; 32] {
-    let mut mac = HmacSha256::new_from_slice(root).expect("hmac");
+    let mut mac = <HmacSha256 as KeyInit>::new_from_slice(root).expect("hmac");
     mac.update(label);
     mac.finalize().into_bytes().into()
 }
 
 fn root_from_shared(shared: &[u8]) -> [u8; 32] {
-    let mut mac = HmacSha256::new_from_slice(b"torex-root-v1").expect("hmac");
+    let mut mac = <HmacSha256 as KeyInit>::new_from_slice(b"torex-root-v1").expect("hmac");
     mac.update(shared);
     mac.finalize().into_bytes().into()
 }

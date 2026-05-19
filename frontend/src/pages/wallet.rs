@@ -1,7 +1,5 @@
-use leptos::*;
-use leptos_router::A;
+use leptos::prelude::*;
 use serde_json::json;
-use wasm_bindgen::JsValue;
 use web_sys::window;
 
 use crate::core::api;
@@ -27,7 +25,7 @@ pub fn Wallet() -> impl IntoView {
     let (loading_withdraw, set_loading_withdraw) = create_signal(false);
 
     // Load balance on mount
-    create_effect(move |_| {
+    Effect::new(move || {
         wasm_bindgen_futures::spawn_local(async move {
             if let Ok(v) = api::get("/api/wallet/balance").await {
                 let usdt = v["usdt"].as_str().unwrap_or("0.00").to_string();

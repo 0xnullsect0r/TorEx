@@ -1,4 +1,5 @@
 use bip39::{Language, Mnemonic};
+use getrandom::getrandom;
 use ed25519_dalek::{SigningKey, Signer};
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
@@ -52,9 +53,11 @@ impl DerivedKeys {
 
 /// Generate a new 24-word BIP39 mnemonic.
 pub fn generate_mnemonic() -> String {
-    let mnemonic = Mnemonic::generate_in(Language::English, 24)
-        .expect("entropy available");
-    mnemonic.to_string()
+    let mut entropy = [0u8; 32]; // 256 bits → 24 words
+    getrandom(&mut entropy).expect("entropy available");
+    Mnemonic::from_entropy_in(Language::English, &entropy)
+        .expect("valid entropy")
+        .to_string()
 }
 
 /// Validate a mnemonic phrase.

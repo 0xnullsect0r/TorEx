@@ -1,4 +1,4 @@
-use gloo_net::http::{Request, RequestBuilder};
+use gloo_net::http::RequestBuilder;
 use serde::Serialize;
 use serde_json::Value;
 use wasm_bindgen::JsValue;
@@ -6,7 +6,7 @@ use wasm_bindgen::JsValue;
 use crate::core::storage;
 
 fn build(method: &str, path: &str) -> RequestBuilder {
-    let rb = Request::new(path).method(method.parse().expect("method"));
+    let rb = RequestBuilder::new(path).method(method.parse().expect("method"));
     // Attach user session
     if let Some(sid) = storage::get_session_id() {
         rb.header("X-Session-Id", &sid)
@@ -16,7 +16,7 @@ fn build(method: &str, path: &str) -> RequestBuilder {
 }
 
 fn build_admin(method: &str, path: &str) -> RequestBuilder {
-    let rb = Request::new(path).method(method.parse().expect("method"));
+    let rb = RequestBuilder::new(path).method(method.parse().expect("method"));
     if let Some(tok) = storage::get_admin_session() {
         rb.header("X-Admin-Session", &tok)
     } else {

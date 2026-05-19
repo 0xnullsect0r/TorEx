@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::prelude::*;
 use serde_json::json;
 
 use crate::core::api;
@@ -6,7 +6,7 @@ use crate::core::api;
 #[component]
 pub fn OrderEntry(
     pair: ReadSignal<String>,
-    on_placed: Callback<()>,
+    on_placed: UnsyncCallback<()>,
 ) -> impl IntoView {
     let (side, set_side) = create_signal("buy");
     let (order_type, set_order_type) = create_signal("limit");
@@ -59,7 +59,7 @@ pub fn OrderEntry(
                 Ok(_) => {
                     set_quantity.set(String::new());
                     set_price.set(String::new());
-                    on_placed.call(());
+                    on_placed.run(());
                 }
                 Err(e) => set_error.set(Some(e)),
             }

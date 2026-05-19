@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::prelude::*;
 use crate::core::types::OrderBookSnapshot;
 
 #[component]
@@ -10,7 +10,7 @@ pub fn OrderBook(snapshot: Signal<OrderBookSnapshot>) -> impl IntoView {
                 if book.bids.is_empty() && book.asks.is_empty() {
                     return view! {
                         <div class="text-muted" style="text-align:center;padding:16px;">"Connecting…"</div>
-                    }.into_view();
+                    }.into_any();
                 }
 
                 let max_qty: f64 = book.asks.iter().chain(book.bids.iter())
@@ -66,7 +66,7 @@ pub fn OrderBook(snapshot: Signal<OrderBookSnapshot>) -> impl IntoView {
                             }
                         }).collect::<Vec<_>>()}
                     </div>
-                }.into_view()
+                }.into_any()
             }}
         </div>
     }
