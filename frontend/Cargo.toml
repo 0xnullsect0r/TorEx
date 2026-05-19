@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 leptos = { version = "0.7", features = ["csr"] }
-leptos_router = { version = "0.7", features = ["browser"] }
+leptos_router = { version = "0.7" }
 
 gloo-net = { version = "0.6", features = ["http", "websocket"] }
 gloo-storage = "0.3"
