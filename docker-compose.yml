@@ -182,6 +182,7 @@ services:
       network: host
     networks:
       - internal
+      - external_facing
     volumes:
       - tor_data:/var/lib/tor
     depends_on:
