@@ -2,6 +2,9 @@ networks:
   internal:
     driver: bridge
     internal: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
   external_facing:
     driver: bridge
 
@@ -26,8 +29,9 @@ services:
     ports:
       - "80:80"
     networks:
-      - internal
-      - external_facing
+      internal:
+        ipv4_address: 172.28.0.10
+      external_facing:
     depends_on:
       backend:
         condition: service_healthy
