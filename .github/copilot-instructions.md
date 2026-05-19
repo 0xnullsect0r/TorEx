@@ -1,5 +1,11 @@
 # TorEx — Copilot Instructions
 
+## Project Overview
+
+TorEx is a privacy-first USDT spot exchange that runs **exclusively as a Tor v3 hidden service**. Users access it only through Tor Browser at the `.onion` address. There is **no clearnet exposure**. All traffic flows: `Tor Browser → tor daemon → nginx → backend`.
+
+**There is no public-facing REST API.** nginx only serves static WASM files and proxies the `/ws` WebSocket endpoint. All frontend↔backend communication must go through the Noise XX + Signal ratchet encrypted WebSocket.
+
 ## Build & Test Commands
 
 ```bash
@@ -12,8 +18,8 @@ cd backend && cargo test --lib
 # Run specific test
 cd backend && cargo test --lib -p matching test_limit_buy_matches_limit_sell
 
-# Build Flutter web
-cd frontend && flutter pub get && flutter build web --release
+# Check frontend WASM compiles
+cd frontend && cargo check --target wasm32-unknown-unknown
 
 # Validate Docker Compose config
 docker compose config
@@ -25,35 +31,57 @@ docker compose up --build
 
 ## Architecture
 
-**Single Docker Compose deployment** — nginx on port 80 is the only public port. All other services (Postgres, Redis, Kafka, Vault, Tor) are on an internal bridge network.
+**Single Docker Compose deployment** — all services use `network_mode: host`. nginx on port 80 is the only port reachable from Tor. The OS firewall prevents any direct clearnet access.
+
+```
+Tor Browser
+    │  (Tor circuit)
+    ▼
+tor daemon (:9050) ── HiddenServicePort 80 ──► nginx (:80)
+                                                    │
+                                          ┌─────────┴──────────┐
+                                          │                      │
+                                     static WASM            /ws WebSocket
+                                     (Leptos SPA)           │
+                                                    backend (:8080)
+                                                         │
+                                              ┌──────────┼──────────┐
+                                           postgres   redis      kafka
+                                           (:5432)   (:6379)   (:9092)
+                                              │
+                                           vault (:8200)
+```
 
 **Rust backend** — Tokio + Axum 0.7 workspace of 9 crates compiled into one static musl binary (`torex`):
 - `shared` — PgPool, Redis, Kafka wrappers, newtypes (UserId, Amount), AppConfig
 - `crypto_primitives` — Noise XX (snow), Signal Double Ratchet (x25519-dalek + AES-GCM), Groth16 ZK (arkworks), DLEQ stealth addresses, balance AES-GCM encryption
-- `auth` — Public-key-only auth (ed25519 signatures), Noise session = credential (no JWT), admin login (hCaptcha + TOTP + Passkeys), Redis sessions
+- `auth` — Public-key-only auth (ed25519 signatures), Noise session = credential (no JWT), admin login (bcrypt+TOTP), Redis sessions
 - `wallet` — Internal USDT ledger, stealth deposit addresses, ZK-proof withdrawal, encrypted balance blob
-- `matching` — In-memory BTreeMap order book (FIFO price-time priority), Limit + Market orders
+- `matching` — In-memory BTreeMap order book (FIFO price-time priority), all 11 order types
 - `settlement` — Kafka consumer on `trades`, atomic Postgres debit/credit + fee deduction
 - `fees` — Maker/taker tiered fee engine (30d rolling volume → tier lookup)
 - `blockchain` — TRC-20 + ERC-20 monitor, withdrawal executor (hot < 10k USDT, cold ≥ 10k)
 - `ws_gateway` — Axum WebSocket, Noise_XX + Signal ratchet on connect, 100ms orderbook snapshots
-- `admin` — Admin stats, fee tier CRUD, withdrawal approval, user list (no PII)
+- `admin` — Admin REST handlers (stats, users, fee tiers, withdrawals) — internal only, not nginx-proxied
 
-**Flutter frontend** — Web (WASM renderer) + Android/iOS. State: flutter_riverpod. Key files:
-- `lib/app.dart` — Auth gate (mnemonic present → TradingPage, else OnboardingPage)
-- `lib/core/crypto/` — WASM bridge for Rust crypto, key derivation service
-- `lib/core/network/` — NoiseHttpClient (Dio interceptor), WsClient (WebSocket + Signal)
-- `lib/features/trading/` — OrderBookWidget, ChartWidget (fl_chart), OrderEntryWidget
-- `lib/features/wallet/` — Deposit (QR + stealth addr), withdraw (ZK proof), balance tiers
-- `lib/features/admin/` — Admin login (hCaptcha + TOTP), dashboard (stats, fee revenue, withdrawals)
+**Leptos frontend** — Rust → WASM (wasm32-unknown-unknown), built with Trunk, served by nginx:
+- `src/app.rs` — Auth gate (mnemonic present → TradingPage, else OnboardingPage), theme context, AdminGuard
+- `src/core/crypto.rs` — BIP39 key derivation, ed25519, x25519 in WASM
+- `src/core/ws.rs` — Noise XX + Signal ratchet WebSocket client (the ONLY frontend↔backend channel)
+- `src/core/api.rs` — ⚠️ Legacy HTTP client — nginx proxy removed, routes 404. Must be replaced with WS RPC.
+- `src/features/trading/` — OrderBook, Chart, OrderEntry (all 11 order types)
+- `src/features/wallet/` — Deposit (QR + stealth addr), withdraw (ZK proof), balance
+- `src/features/admin/` — Admin login (no hCaptcha — correct for Tor), dashboard (stats, fee tiers, withdrawals)
 
 ## Key Conventions
+
+**No public-facing API.** nginx does NOT proxy `/api/` or `/admin/api/`. Backend routes exist internally but are unreachable from outside. All user-facing communication must go through `/ws` (WebSocket).
 
 **No PII logged anywhere.** Tracing fields: `event` (string enum), `order_id`, `trade_id` only. Never log `user_id`, `pubkey`, IP, or session tokens.
 
 **Noise session = auth.** No JWT. After Noise_XX handshake, the `X-Session-Id` header maps to a Redis key. The `NoiseAuth` extractor (in `auth` crate) provides the authenticated `UserId`.
 
-**Admin sessions are separate.** Admin uses `X-Admin-Session` header, stored in Redis under `admin:session:<token>`. 1-hour TTL vs 24-hour for user sessions.
+**Admin sessions are separate.** Admin uses `X-Admin-Session` header, stored in Redis under `admin:session:<token>`. 1-hour TTL vs 24-hour for user sessions. Default credentials: `admin` / `adminpassword`.
 
 **Balances are always encrypted.** The `enc_balance` column in Postgres is AES-256-GCM. The decryption key lives only in Vault (`secret/torex/balance_enc_key`). In dev, `fetch_balance_key()` in settlement falls back to a zeroed key.
 
@@ -65,9 +93,34 @@ docker compose up --build
 
 **SQLX_OFFLINE=true for Docker builds.** The Dockerfile sets `SQLX_OFFLINE=true` so sqlx compile-time query checks are skipped. For dev, run `cargo sqlx prepare` after schema changes.
 
+**wasm-bindgen 0.2.121 requires reference-types ENABLED.** Do NOT add `RUSTFLAGS="-C target-feature=-reference-types"` anywhere — it will cause `__wbindgen_externref_table_dealloc` linker errors.
+
+**No external service calls from the frontend.** This is Tor — no Google Fonts, no hCaptcha, no analytics, no CDNs. Everything must be self-hosted or omitted.
+
 **Top 200 trading pairs** are all `CRYPTO/USDT`. Chain config for ERC-20, TRC-20, BEP-20, Polygon, Avalanche, Arbitrum, Optimism, Solana is in the `chain_config` table seeded in `init.sql`.
 
 **Tor vanity generation** runs once at first `docker compose up`. The `torex` prefix takes ~minutes with `-t 4`. Key stored in the `tor_data` Docker volume. Set `start_period: 600s` in the tor healthcheck.
+
+## Supported Order Types (all 11 implemented in matching crate)
+
+Limit, Market, StopLimit, StopMarket, TrailingStop, OCO (One-Cancels-Other), Iceberg, TWAP, FOK (Fill-or-Kill), IOC (Immediate-or-Cancel), PostOnly
+
+## WebSocket RPC Protocol (next agent must implement)
+
+All frontend↔backend communication should use this protocol over the Noise+Signal encrypted WebSocket at `/ws`:
+
+```json
+// Client → Server (encrypted in Signal ratchet)
+{"id": "uuid", "method": "order.place", "params": {...}}
+
+// Server → Client response
+{"id": "uuid", "ok": true, "data": {...}}
+
+// Server → Client push (no id, no response)
+{"type": "orderbook", "data": {...}}
+```
+
+Methods needed: `auth.register`, `order.place`, `order.cancel`, `order.open`, `order.history`, `ticker.get`, `orderbook.get`, `candles.get`, `trades.recent`, `wallet.balance`, `wallet.deposit_address`, `wallet.withdraw`, `admin.login`, `admin.stats`, `admin.users`, `admin.create_user`, `admin.toggle_fee_free`, `admin.fee_tiers`, `admin.withdrawals`, `admin.approve_withdrawal`.
 
 ## Fee Schedule (defaults, admin-configurable)
 
@@ -91,6 +144,5 @@ ETH_NODE_URL=        # wss:// Ethereum node (Infura, Alchemy, etc.)
 TRON_NODE_URL=       # https://api.trongrid.io or private node
 KAFKA_BROKER=kafka:9092
 SECRET_NOISE_STATIC_KEY=   # hex-encoded static keypair for Noise
-HCAPTCHA_SECRET=     # hCaptcha secret key
-HCAPTCHA_SITE_KEY=   # hCaptcha site key (used by Flutter)
+HCAPTCHA_SECRET=     # leave empty — hCaptcha bypassed on Tor
 ```
