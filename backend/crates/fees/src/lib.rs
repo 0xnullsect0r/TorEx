@@ -12,8 +12,21 @@ pub struct FeeTier {
 }
 
 /// Fetch the applicable fee tier for a user's 30-day rolling volume.
+/// Returns zero-fee tier if user has fee_free flag set.
 /// Queries the fee_tiers table; falls back to 16/26 bps if table doesn't exist yet.
 pub async fn get_user_fee_tier(pool: &PgPool, user_id: &str) -> FeeTier {
+    // Check fee_free flag first
+    if let Ok(Some(row)) = sqlx::query("SELECT fee_free FROM users WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+    {
+        let fee_free: bool = row.get("fee_free");
+        if fee_free {
+            return FeeTier { maker_bps: 0, taker_bps: 0 };
+        }
+    }
+
     let result = sqlx::query(
         r#"
         SELECT ft.maker_bps, ft.taker_bps

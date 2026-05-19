@@ -133,7 +133,7 @@ impl Ratchet {
 // Public WS handle
 // ──────────────────────────────────────────────────────────────────────────
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct WsHandle {
     pub orderbook: ReadSignal<OrderBookSnapshot>,
     pub trades: ReadSignal<Vec<Trade>>,

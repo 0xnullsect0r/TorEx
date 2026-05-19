@@ -6,12 +6,13 @@ version = 4
 name = "admin"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "auth",
  "axum",
  "bcrypt",
  "chrono",
  "fees",
+ "hex",
+ "rand 0.8.6",
  "redis",
  "reqwest",
  "serde",

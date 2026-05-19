@@ -6,64 +6,89 @@ use serde_json::Value;
 use crate::core::storage;
 
 fn attach_user_headers(builder: RequestBuilder) -> RequestBuilder {
-    if let Some(session_id) = storage::get_session_id() { builder.header("X-Session-Id", &session_id) } else { builder }
+    if let Some(sid) = storage::get_session_id() { builder.header("X-Session-Id", &sid) } else { builder }
 }
 
 fn attach_admin_headers(builder: RequestBuilder) -> RequestBuilder {
-    if let Some(token) = storage::get_admin_session() { builder.header("X-Admin-Session", &token) } else { builder }
+    if let Some(tok) = storage::get_admin_session() { builder.header("X-Admin-Session", &tok) } else { builder }
 }
 
-async fn send_value(builder: RequestBuilder) -> Result<Value, String> {
-    let response = builder.send().await.map_err(|error| error.to_string())?;
-    let status = response.status();
+async fn send_builder(builder: RequestBuilder) -> Result<Value, String> {
+    let response = builder.send().await.map_err(|e| e.to_string())?;
     let ok = response.ok();
-    let text = response.text().await.map_err(|error| error.to_string())?;
-    if !ok {
-        return Err(format!("HTTP {status}: {}", if text.trim().is_empty() { "<empty>".to_string() } else { text }));
-    }
-    if text.trim().is_empty() { Ok(Value::Null) } else { serde_json::from_str(&text).map_err(|error| error.to_string()) }
+    let status = response.status();
+    let text = response.text().await.map_err(|e| e.to_string())?;
+    if !ok { return Err(format!("HTTP {status}: {}", if text.trim().is_empty() { "<empty>" } else { &text })); }
+    if text.trim().is_empty() { Ok(Value::Null) } else { serde_json::from_str(&text).map_err(|e| e.to_string()) }
+}
+
+async fn send_request(request: Request) -> Result<Value, String> {
+    let response = request.send().await.map_err(|e| e.to_string())?;
+    let ok = response.ok();
+    let status = response.status();
+    let text = response.text().await.map_err(|e| e.to_string())?;
+    if !ok { return Err(format!("HTTP {status}: {}", if text.trim().is_empty() { "<empty>" } else { &text })); }
+    if text.trim().is_empty() { Ok(Value::Null) } else { serde_json::from_str(&text).map_err(|e| e.to_string()) }
+}
+
+fn with_json_body<T: Serialize>(builder: RequestBuilder, body: &T) -> Result<Request, String> {
+    let json = serde_json::to_string(body).map_err(|e| e.to_string())?;
+    builder
+        .header("Content-Type", "application/json")
+        .body(json)
+        .map_err(|e| format!("{e:?}"))
 }
 
 fn decode<T: DeserializeOwned>(value: Value) -> Result<T, String> {
-    serde_json::from_value(value).map_err(|error| error.to_string())
+    serde_json::from_value(value).map_err(|e| e.to_string())
 }
 
-pub async fn get_value(path: &str) -> Result<Value, String> { send_value(attach_user_headers(Request::get(path))).await }
-pub async fn get_json<T: DeserializeOwned>(path: &str) -> Result<T, String> { decode(get_value(path).await?) }
+// ── User auth endpoints ──────────────────────────────────────────────────────
+
+pub async fn get_value(path: &str) -> Result<Value, String> {
+    send_builder(attach_user_headers(Request::get(path))).await
+}
+pub async fn get_json<T: DeserializeOwned>(path: &str) -> Result<T, String> {
+    decode(get_value(path).await?)
+}
 
 pub async fn post_json<T: Serialize, R: DeserializeOwned>(path: &str, body: &T) -> Result<R, String> {
-    let builder = attach_user_headers(Request::post(path)).header("Content-Type", "application/json").json(body).map_err(|error| error.to_string())?;
-    decode(send_value(builder).await?)
+    decode(send_request(with_json_body(attach_user_headers(Request::post(path)), body)?).await?)
 }
 
 pub async fn put_json<T: Serialize, R: DeserializeOwned>(path: &str, body: &T) -> Result<R, String> {
-    let builder = attach_user_headers(Request::put(path)).header("Content-Type", "application/json").json(body).map_err(|error| error.to_string())?;
-    decode(send_value(builder).await?)
+    decode(send_request(with_json_body(attach_user_headers(Request::put(path)), body)?).await?)
 }
 
-pub async fn delete_value(path: &str) -> Result<Value, String> { send_value(attach_user_headers(Request::delete(path))).await }
-pub async fn admin_get_value(path: &str) -> Result<Value, String> { send_value(attach_admin_headers(Request::get(path))).await }
-pub async fn admin_get_json<T: DeserializeOwned>(path: &str) -> Result<T, String> { decode(admin_get_value(path).await?) }
+pub async fn delete_value(path: &str) -> Result<Value, String> {
+    send_builder(attach_user_headers(Request::delete(path))).await
+}
+
+// ── Admin endpoints ──────────────────────────────────────────────────────────
+
+pub async fn admin_get_value(path: &str) -> Result<Value, String> {
+    send_builder(attach_admin_headers(Request::get(path))).await
+}
+pub async fn admin_get_json<T: DeserializeOwned>(path: &str) -> Result<T, String> {
+    decode(admin_get_value(path).await?)
+}
 
 pub async fn admin_post_json<T: Serialize, R: DeserializeOwned>(path: &str, body: &T) -> Result<R, String> {
-    let builder = attach_admin_headers(Request::post(path)).header("Content-Type", "application/json").json(body).map_err(|error| error.to_string())?;
-    decode(send_value(builder).await?)
+    decode(send_request(with_json_body(attach_admin_headers(Request::post(path)), body)?).await?)
 }
 
 pub async fn admin_put_json<T: Serialize, R: DeserializeOwned>(path: &str, body: &T) -> Result<R, String> {
-    let builder = attach_admin_headers(Request::put(path)).header("Content-Type", "application/json").json(body).map_err(|error| error.to_string())?;
-    decode(send_value(builder).await?)
+    decode(send_request(with_json_body(attach_admin_headers(Request::put(path)), body)?).await?)
 }
 
-// Convenience aliases
+// ── Convenience aliases ──────────────────────────────────────────────────────
+
 pub async fn get(path: &str) -> Result<Value, String> { get_value(path).await }
 pub async fn post(path: &str, body: &Value) -> Result<Value, String> {
-    let builder = attach_user_headers(Request::post(path)).header("Content-Type", "application/json").json(body).map_err(|e| e.to_string())?;
-    send_value(builder).await
+    send_request(with_json_body(attach_user_headers(Request::post(path)), body)?).await
 }
 pub async fn delete(path: &str) -> Result<Value, String> { delete_value(path).await }
 pub async fn admin_get(path: &str) -> Result<Value, String> { admin_get_value(path).await }
 pub async fn admin_post(path: &str, body: &Value) -> Result<Value, String> {
-    let builder = attach_admin_headers(Request::post(path)).header("Content-Type", "application/json").json(body).map_err(|e| e.to_string())?;
-    send_value(builder).await
+    send_request(with_json_body(attach_admin_headers(Request::post(path)), body)?).await
 }

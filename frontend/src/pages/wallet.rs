@@ -81,5 +81,5 @@ pub fn WalletPage() -> impl IntoView {
 }
 
 fn copy_to_clipboard(value: &str) {
-    if let Some(clipboard) = window().and_then(|window| window.navigator().clipboard()) { let _ = clipboard.write_text(value); }
+    if let Some(w) = window() { let _ = w.navigator().clipboard().write_text(value); }
 }

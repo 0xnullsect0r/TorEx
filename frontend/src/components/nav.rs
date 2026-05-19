@@ -1,5 +1,4 @@
 use leptos::prelude::*;
-use leptos_router::components::A;
 
 use crate::core::storage;
 use crate::core::types::{Theme, short_id};
@@ -18,14 +17,14 @@ pub fn Nav(
 
     view! {
         <nav class="top-nav">
-            <A href="/trade" class="brand">
+            <a href="/trade" class="brand">
                 <span class="brand-mark">"T"</span>
                 <span class="brand-name">"TorEx"</span>
-            </A>
+            </a>
             <div class="nav-links">
-                <A href="/trade" class="nav-link">"Trade"</A>
-                <A href="/wallet" class="nav-link">"Wallet"</A>
-                {move || if admin_visible() { view! { <A href="/admin/dashboard" class="nav-link">"Admin"</A> }.into_any() } else { view! { <A href="/admin" class="nav-link">"Admin"</A> }.into_any() }}
+                <a href="/trade" class="nav-link">"Trade"</a>
+                <a href="/wallet" class="nav-link">"Wallet"</a>
+                {move || if admin_visible() { view! { <a href="/admin/dashboard" class="nav-link">"Admin"</a> }.into_any() } else { view! { <a href="/admin" class="nav-link">"Admin"</a> }.into_any() }}
             </div>
             <div class="nav-actions">
                 <div class="connection-pill"><span class=move || if is_connected() { "status-dot online" } else { "status-dot" }></span><span>{move || if is_connected() { "Realtime connected" } else { "Offline" }}</span></div>

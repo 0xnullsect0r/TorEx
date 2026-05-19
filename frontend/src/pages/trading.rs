@@ -147,7 +147,7 @@ pub fn TradingPage() -> impl IntoView {
 
                     <div class="stats-bar">
                         <div class="stat-chip"><div class="stat-label">"Last Price"</div><div class="stat-value mono">{move || format!("{:.4}", pair_stats.get().last_price)}</div></div>
-                        <div class="stat-chip"><div class="stat-label">"24h Change"</div><div class=move || if pair_stats.get().change_percent >= 0.0 { "stat-value mono text-buy" } else { "stat-value mono text-sell" }>{move || format!("{:+.2}%", pair_stats.get().change_percent)}</div></div>
+                        <div class="stat-chip"><div class="stat-label">"24h Change"</div><div class=move || { if pair_stats.get().change_percent >= 0.0 { "stat-value mono text-buy" } else { "stat-value mono text-sell" } }>{move || format!("{:+.2}%", pair_stats.get().change_percent)}</div></div>
                         <div class="stat-chip"><div class="stat-label">"24h High"</div><div class="stat-value mono">{move || format!("{:.4}", pair_stats.get().high_24h)}</div></div>
                         <div class="stat-chip"><div class="stat-label">"24h Low"</div><div class="stat-value mono">{move || format!("{:.4}", pair_stats.get().low_24h)}</div></div>
                         <div class="stat-chip"><div class="stat-label">"24h Volume"</div><div class="stat-value mono">{move || format!("{:.2}", pair_stats.get().volume_24h)}</div><div class="stat-subvalue">"Base asset volume"</div></div>

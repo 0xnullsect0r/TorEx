@@ -16,7 +16,8 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 redis = { workspace = true }
 tracing = { workspace = true }
-anyhow = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
 bcrypt = { workspace = true }
 totp-rs = { workspace = true }
 reqwest = { workspace = true }

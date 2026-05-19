@@ -244,7 +244,7 @@ fn render_users_tab(users: Vec<User>, total: i64, user_page: ReadSignal<usize>, 
                             let toggle_id = user_id.clone();
                             let is_expanded = expanded_user.get() == Some(user_id.clone());
                             let activity = activities.get(&user_id).cloned();
-                            let mut rows = vec![view! {
+                            let mut rows: Vec<AnyView> = vec![view! {
                                 <tr>
                                     <td><button class="copy-button" on:click=move |_| copy_text(&copy_id)>{short_id(&user.user_id)}</button></td>
                                     <td>{user.created_at.clone()}</td>
@@ -266,7 +266,7 @@ fn render_users_tab(users: Vec<User>, total: i64, user_page: ReadSignal<usize>, 
                                         </div>
                                     </td>
                                 </tr>
-                            }];
+                            }.into_any()];
                             if is_expanded {
                                 rows.push(view! {
                                     <tr class="expanded-row">
@@ -277,7 +277,7 @@ fn render_users_tab(users: Vec<User>, total: i64, user_page: ReadSignal<usize>, 
                                             </div>
                                         </td>
                                     </tr>
-                                });
+                                }.into_any());
                             }
                             rows
                         }).collect::<Vec<_>>()}
@@ -367,7 +367,7 @@ fn render_volume_tab(rows: Vec<VolumeByPair>) -> AnyView {
 }
 
 fn copy_text(value: &str) {
-    if let Some(clipboard) = window().and_then(|window| window.navigator().clipboard()) {
-        let _ = clipboard.write_text(value);
+    if let Some(w) = window() {
+        let _ = w.navigator().clipboard().write_text(value);
     }
 }
