@@ -22,6 +22,7 @@ if [ ! -f "$ONION_DIR/hs_ed25519_secret_key" ]; then
   cp "$KEY_DIR/$ONION_SUBDIR/hs_ed25519_secret_key" "$ONION_DIR/hs_ed25519_secret_key"
   cp "$KEY_DIR/$ONION_SUBDIR/hs_ed25519_public_key" "$ONION_DIR/hs_ed25519_public_key"
   echo "$ONION_ADDR" > "$ONION_DIR/hostname"
+  chmod 700 "$ONION_DIR"
 
   echo ""
   echo "╔══════════════════════════════════════════════════════╗"
@@ -31,6 +32,7 @@ if [ ! -f "$ONION_DIR/hs_ed25519_secret_key" ]; then
 else
   ONION_ADDR=$(cat "$ONION_DIR/hostname")
   echo "=== Using existing .onion address: ${ONION_ADDR} ==="
+  chmod 700 "$ONION_DIR"
 fi
 
 exec tor -f /etc/tor/torrc
