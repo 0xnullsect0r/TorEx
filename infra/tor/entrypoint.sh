@@ -4,6 +4,11 @@ set -e
 ONION_DIR=/var/lib/tor/hidden_service
 KEY_DIR=/var/lib/tor/vanity_key
 
+# Tor requires DataDirectory (/var/lib/tor) to be owned by the current user.
+# Alpine's 'apk add tor' sets it to uid 100 (tor), but we run as root.
+# Fix ownership so tor doesn't refuse to start.
+chown root:root /var/lib/tor
+
 # If we don't have a key yet, generate a vanity one
 if [ ! -f "$ONION_DIR/hs_ed25519_secret_key" ]; then
   echo "=== Generating vanity .onion address (prefix: torex) ==="
