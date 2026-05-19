@@ -224,6 +224,7 @@ pub mod config {
         pub vault_token: String,
         pub eth_node_url: String,
         pub tron_node_url: String,
+        pub tron_pro_api_key: String,
         pub hcaptcha_secret: String,
     }
 
@@ -238,6 +239,7 @@ pub mod config {
                 vault_token: std::env::var("VAULT_TOKEN").unwrap_or_default(),
                 eth_node_url: std::env::var("ETH_NODE_URL").unwrap_or_default(),
                 tron_node_url: std::env::var("TRON_NODE_URL").unwrap_or_default(),
+                tron_pro_api_key: std::env::var("TRON_PRO_API_KEY").unwrap_or_default(),
                 hcaptcha_secret: std::env::var("HCAPTCHA_SECRET").unwrap_or_default(),
             })
         }

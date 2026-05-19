@@ -54,6 +54,7 @@ services:
       VAULT_TOKEN: ${VAULT_TOKEN}
       ETH_NODE_URL: ${ETH_NODE_URL}
       TRON_NODE_URL: ${TRON_NODE_URL}
+      TRON_PRO_API_KEY: ${TRON_PRO_API_KEY:-}
       HCAPTCHA_SECRET: ${HCAPTCHA_SECRET}
     depends_on:
       postgres:

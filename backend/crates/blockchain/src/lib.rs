@@ -63,7 +63,12 @@ async fn poll_eth(pool: &PgPool, config: &AppConfig) -> anyhow::Result<()> {
 
 async fn poll_tron(pool: &PgPool, config: &AppConfig) -> anyhow::Result<()> {
     if config.tron_node_url.is_empty() { return Ok(()); }
-    let _: serde_json::Value = reqwest::Client::new().get(&config.tron_node_url).send().await?.json().await.unwrap_or_default();
+    let client = reqwest::Client::new();
+    let mut req = client.get(&config.tron_node_url);
+    if !config.tron_pro_api_key.is_empty() {
+        req = req.header("TRON-Pro-Api-Key", &config.tron_pro_api_key);
+    }
+    let _: serde_json::Value = req.send().await?.json().await.unwrap_or_default();
     let deposits = sqlx::query("SELECT stealth_addr FROM deposits WHERE confirmed_at IS NULL")
         .fetch_all(pool)
         .await?;

@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 pub async fn run_settlement_consumer(pool: PgPool, kafka_consumer: KafkaConsumer, kafka_producer: KafkaProducer) {
     let config = AppConfig::from_env().unwrap_or_else(|_| AppConfig {
-        postgres_url: String::new(), redis_url: String::new(), kafka_broker: String::new(), vault_addr: String::new(), vault_token: String::new(), eth_node_url: String::new(), tron_node_url: String::new(), hcaptcha_secret: String::new()
+        postgres_url: String::new(), redis_url: String::new(), kafka_broker: String::new(), vault_addr: String::new(), vault_token: String::new(), eth_node_url: String::new(), tron_node_url: String::new(), tron_pro_api_key: String::new(), hcaptcha_secret: String::new()
     });
     loop {
         match kafka_consumer.inner().recv().await {
