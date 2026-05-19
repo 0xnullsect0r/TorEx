@@ -21,7 +21,9 @@ x-logging: &default-logging
 
 services:
   nginx:
-    build: ./nginx
+    build:
+      context: ./nginx
+      network: host
     ports:
       - "80:80"
     networks:
@@ -41,7 +43,9 @@ services:
       retries: 3
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      network: host
     networks:
       - internal
     environment:
@@ -151,7 +155,9 @@ services:
       start_period: 5s
 
   tor:
-    build: ./infra/tor
+    build:
+      context: ./infra/tor
+      network: host
     networks:
       - internal
     volumes:
