@@ -1,22 +1,28 @@
-FROM alpine:3.19
+FROM alpine:3.21
 
-# Install tor + build deps in one layer, build mkp224o, then remove build deps
-RUN apk add --no-cache \
+# Separate apk update so its layer is cached; avoids re-downloading APKINDEX on retry
+RUN apk update
+
+# Install tor + build deps (uses cached index from previous layer)
+RUN apk add \
     tor \
     build-base \
     autoconf \
     automake \
     libsodium-dev \
-    git \
-    && git clone --depth=1 https://github.com/cathugger/mkp224o /tmp/mkp224o \
+    git
+
+# Build mkp224o, strip build deps, clean cache
+RUN git clone --depth=1 https://github.com/cathugger/mkp224o /tmp/mkp224o \
     && cd /tmp/mkp224o \
     && ./autogen.sh \
-    && ./configure --enable-static-sodium \
+    && ./configure \
     && make -j$(nproc) \
     && strip mkp224o \
     && cp mkp224o /usr/local/bin/mkp224o \
     && rm -rf /tmp/mkp224o \
-    && apk del build-base autoconf automake libsodium-dev git
+    && apk del build-base autoconf automake libsodium-dev git \
+    && rm -rf /var/cache/apk/*
 
 COPY torrc /etc/tor/torrc
 COPY entrypoint.sh /entrypoint.sh
