@@ -95,7 +95,15 @@ tor daemon (:9050) ── HiddenServicePort 80 ──► nginx (:80)
 
 **wasm-bindgen 0.2.121 requires reference-types ENABLED.** Do NOT add `RUSTFLAGS="-C target-feature=-reference-types"` anywhere — it will cause `__wbindgen_externref_table_dealloc` linker errors.
 
-**No external service calls from the frontend.** This is Tor — no Google Fonts, no hCaptcha, no analytics, no CDNs. Everything must be self-hosted or omitted.
+**No external service calls from the frontend.** This is Tor — no Google Fonts, no hCaptcha, no analytics, no CDNs. Everything must be self-hosted or omitted. ⚠️ The nginx Content-Security-Policy still references `fonts.googleapis.com` — this needs to be removed.
+
+**nginx rate-limits by `$server_addr`, not `$binary_remote_addr`.** Tor exit nodes share IPs; per-IP limiting would DOS all Tor users. Per-server-address limits apply uniformly.
+
+**Vault runs in dev mode** (in-memory, no persistence). Vault data is lost on restart. For production, switch to file-backed storage with auto-unseal.
+
+**User identity** is `BLAKE2b(ed25519_pubkey)[0..32]`, stored as hex TEXT in Postgres. Deterministic from the public key — no UUID generation.
+
+**Stealth deposit addresses expire after 48 hours** if unconfirmed, to limit blockchain address enumeration.
 
 **Top 200 trading pairs** are all `CRYPTO/USDT`. Chain config for ERC-20, TRC-20, BEP-20, Polygon, Avalanche, Arbitrum, Optimism, Solana is in the `chain_config` table seeded in `init.sql`.
 
@@ -104,6 +112,10 @@ tor daemon (:9050) ── HiddenServicePort 80 ──► nginx (:80)
 ## Supported Order Types (all 11 implemented in matching crate)
 
 Limit, Market, StopLimit, StopMarket, TrailingStop, OCO (One-Cancels-Other), Iceberg, TWAP, FOK (Fill-or-Kill), IOC (Immediate-or-Cancel), PostOnly
+
+**Known incomplete implementations:**
+- **TWAP** — orders are accepted and stored but the time-sliced execution background task is not wired up yet.
+- **Iceberg** — visible slice is placed correctly but the hidden reserve is not auto-refilled after the visible quantity fills.
 
 ## WebSocket RPC Protocol (next agent must implement)
 
@@ -133,6 +145,22 @@ Methods needed: `auth.register`, `order.place`, `order.cancel`, `order.open`, `o
 | $250k – $1M | 0.08% | 0.18% |
 | $1M – $10M | 0.06% | 0.16% |
 | > $10M | 0.00% | 0.10% |
+
+## Default Credentials
+
+| Service | Username | Password / Token |
+|---|---|---|
+| Admin panel | `admin` | `adminpassword` — change after first boot |
+| PostgreSQL | `postgres` | set via `POSTGRES_PASSWORD` in `.env` |
+| Redis | — | set via `REDIS_PASSWORD` in `.env` |
+| Vault | — | `VAULT_TOKEN=root` (dev mode) |
+
+## Deploy
+
+```bash
+# Server: ssh root@hiddenservice, repo at /root/TorEx
+cd /root/TorEx && git pull && docker compose up -d --build
+```
 
 ## Environment Variables (.env.example)
 
