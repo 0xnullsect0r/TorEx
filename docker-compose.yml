@@ -48,7 +48,7 @@ services:
     networks:
       - internal
     environment:
-      POSTGRES_URL: postgres://backend_user:${POSTGRES_PASSWORD}@postgres:5432/torex
+      POSTGRES_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/torex
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       KAFKA_BROKER: kafka:9092
       VAULT_ADDR: http://vault:8200
