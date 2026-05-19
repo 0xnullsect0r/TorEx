@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TorEx — Privacy-First USDT Exchange</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0D0D0F;
+      color: #E8E8E8;
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+    }
+    .logo {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: #7B61FF;
+    }
+    .logo span { color: #E8E8E8; }
+    .tagline {
+      font-size: 1.1rem;
+      color: #888;
+      letter-spacing: 0.05em;
+    }
+    .status {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      background: #16161A;
+      border: 1px solid #2a2a32;
+      border-radius: 12px;
+      padding: 2rem 3rem;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #00C853;
+      display: inline-block;
+      margin-right: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .status-row {
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+    .status-row strong { color: #E8E8E8; }
+    .footer { color: #444; font-size: 0.8rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="logo">Tor<span>Ex</span></div>
+  <div class="tagline">Privacy-First USDT Exchange · Tor Hidden Service</div>
+  <div class="status">
+    <div class="status-row"><span class="dot"></span><strong>Backend</strong> — Online</div>
+    <div class="status-row"><span class="dot"></span><strong>Order Book</strong> — Active</div>
+    <div class="status-row"><span class="dot"></span><strong>Tor Network</strong> — Connected</div>
+  </div>
+  <div class="footer">Frontend loading — connect via .onion address</div>
+</body>
+</html>

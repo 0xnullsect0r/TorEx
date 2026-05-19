@@ -21,7 +21,7 @@ x-logging: &default-logging
 services:
   nginx:
     build:
-      context: ./frontend
+      context: ./nginx
       network: host
     ports:
       - "80:80"
@@ -36,10 +36,11 @@ services:
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 6
+      start_period: 15s
 
   backend:
     build:
