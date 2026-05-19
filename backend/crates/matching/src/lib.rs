@@ -13,10 +13,28 @@ use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Side { Buy, Sell }
+impl Side {
+    pub fn to_db_str(&self) -> &'static str { match self { Side::Buy => "buy", Side::Sell => "sell" } }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OrderType { Limit, Market }
+impl OrderType {
+    pub fn to_db_str(&self) -> &'static str { match self { OrderType::Limit => "limit", OrderType::Market => "market" } }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OrderStatus { Open, PartiallyFilled, Filled, Cancelled }
+impl OrderStatus {
+    pub fn to_db_str(&self) -> &'static str {
+        match self {
+            OrderStatus::Open => "open",
+            OrderStatus::PartiallyFilled => "partially_filled",
+            OrderStatus::Filled => "filled",
+            OrderStatus::Cancelled => "cancelled",
+        }
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Order {
@@ -246,12 +264,12 @@ async fn create_order(NoiseAuth(user_id): NoiseAuth, Json(payload): Json<CreateO
         .bind(order.order_id)
         .bind(&order.user_id)
         .bind(&order.pair)
-        .bind(format!("{:?}", order.side))
-        .bind(format!("{:?}", order.order_type))
+        .bind(order.side.to_db_str())
+        .bind(order.order_type.to_db_str())
         .bind(order.price)
         .bind(order.quantity)
         .bind(order.filled)
-        .bind(format!("{:?}", order.status))
+        .bind(order.status.to_db_str())
         .execute(&state.pool)
         .await
         .map_err(internal)?;
@@ -293,7 +311,7 @@ async fn cancel_order(NoiseAuth(user_id): NoiseAuth, Path(order_id): Path<Uuid>)
     if owner != user_id.to_hex() { return Err(AppError::Unauthorized); }
     let pair: String = row.get("pair");
     if let Some(book) = state.books.get(&pair) { book.lock().cancel(order_id); }
-    sqlx::query("UPDATE orders SET status = 'Cancelled' WHERE order_id = $1")
+    sqlx::query("UPDATE orders SET status = 'cancelled' WHERE order_id = $1")
         .bind(order_id)
         .execute(&state.pool)
         .await
@@ -302,7 +320,7 @@ async fn cancel_order(NoiseAuth(user_id): NoiseAuth, Path(order_id): Path<Uuid>)
 }
 
 async fn list_orders(NoiseAuth(user_id): NoiseAuth) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    let rows = sqlx::query("SELECT order_id, pair, side, order_type, price, quantity, filled, status, created_at FROM orders WHERE user_id = $1 AND status IN ('Open', 'PartiallyFilled') ORDER BY created_at DESC")
+    let rows = sqlx::query("SELECT order_id, pair, side, order_type, price, quantity, filled, status, created_at FROM orders WHERE user_id = $1 AND status IN ('open', 'partially_filled') ORDER BY created_at DESC")
         .bind(user_id.to_hex())
         .fetch_all(&matching_state().pool)
         .await

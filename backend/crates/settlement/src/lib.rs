@@ -69,7 +69,7 @@ async fn process_trade(pool: &PgPool, producer: &KafkaProducer, config: &AppConf
         .execute(&mut *tx)
         .await
         .context("failed to update buyer balance")?;
-    for (order_id, filled_status) in [(trade.buyer_order_id, "Filled"), (trade.seller_order_id, "Filled")] {
+    for (order_id, filled_status) in [(trade.buyer_order_id, "filled"), (trade.seller_order_id, "filled")] {
         sqlx::query("UPDATE orders SET filled = quantity, status = $1 WHERE order_id = $2")
             .bind(filled_status)
             .bind(order_id)
