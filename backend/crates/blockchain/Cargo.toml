@@ -1,0 +1,20 @@
+[package]
+name = "blockchain"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared = { path = "../shared" }
+crypto_primitives = { path = "../crypto_primitives" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+rdkafka = { workspace = true }
+reqwest = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+bigdecimal = { workspace = true }
+hex = { workspace = true }

@@ -1,0 +1,22 @@
+[package]
+name = "admin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared = { path = "../shared" }
+auth = { path = "../auth" }
+fees = { path = "../fees" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+redis = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+bcrypt = { workspace = true }
+totp-rs = { workspace = true }
+reqwest = { workspace = true }

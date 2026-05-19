@@ -1,0 +1,13 @@
+.env
+target/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.g.dart
+*.freezed.dart
+postgres_data/
+kafka_data/
+vault_data/
+tor_data/
+/tor_keygen/

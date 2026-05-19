@@ -1,0 +1,21 @@
+[package]
+name = "ws_gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared = { path = "../shared" }
+crypto_primitives = { path = "../crypto_primitives" }
+auth = { path = "../auth" }
+matching = { path = "../matching" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+redis = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+futures-util = { workspace = true }
+dashmap = { workspace = true }
+rand = { workspace = true }
+x25519-dalek = { workspace = true }

@@ -1,0 +1,22 @@
+[package]
+name = "matching"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared = { path = "../shared" }
+auth = { path = "../auth" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+rdkafka = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+bigdecimal = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
