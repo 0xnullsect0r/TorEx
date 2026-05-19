@@ -1,11 +1,17 @@
 # syntax=docker/dockerfile:1
 
-# cargo-chef pre-installed; avoids `cargo install --locked` failures
-FROM lukemathwalker/cargo-chef:latest-rust-1-slim-bookworm AS chef
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev musl-tools \
-    && rm -rf /var/lib/apt/lists/*
-RUN rustup target add x86_64-unknown-linux-musl
+# Alpine-based cargo-chef: native musl target, no apt-get needed
+FROM lukemathwalker/cargo-chef:latest-rust-1-alpine AS chef
+RUN apk add --no-cache \
+    pkgconfig \
+    openssl-dev \
+    openssl-libs-static \
+    cmake \
+    make \
+    musl-dev \
+    zlib-dev \
+    zlib-static \
+    build-base
 WORKDIR /app
 
 FROM chef AS planner
@@ -14,12 +20,15 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json
+ENV OPENSSL_STATIC=1
+RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 ENV SQLX_OFFLINE=true
-RUN cargo build --release --target x86_64-unknown-linux-musl --bin torex
+RUN cargo build --release --bin torex
 
-FROM scratch AS runtime
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/torex /torex
+# Minimal Alpine runtime with CA certs for TLS
+FROM alpine:3.19 AS runtime
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /app/target/release/torex /torex
 EXPOSE 8080
 ENTRYPOINT ["/torex"]
