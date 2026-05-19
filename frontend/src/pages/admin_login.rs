@@ -1,108 +1,53 @@
 use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
-use serde_json::json;
 use wasm_bindgen::JsCast;
-use web_sys::{window, HtmlInputElement};
+use web_sys::{HtmlInputElement, window};
 
 use crate::core::{api, storage};
 
 #[component]
 pub fn AdminLogin() -> impl IntoView {
-    let (username, set_username) = create_signal(String::new());
-    let (password, set_password) = create_signal(String::new());
-    let (totp, set_totp) = create_signal(String::new());
-    let (totp_required, set_totp_required) = create_signal(false);
-    let (error, set_error) = create_signal(Option::<String>::None);
-    let (loading, set_loading) = create_signal(false);
-
+    let (username, set_username) = signal(String::new());
+    let (password, set_password) = signal(String::new());
+    let (totp, set_totp) = signal(String::new());
+    let (totp_required, set_totp_required) = signal(false);
+    let (error, set_error) = signal(None::<String>);
     let navigate = use_navigate();
 
-    let do_login = move |_| {
-        let user = username.get();
-        let pass = password.get();
-        let totp_code = totp.get();
-        let nav = navigate.clone();
-        set_error.set(None);
-        set_loading.set(true);
-
-        wasm_bindgen_futures::spawn_local(async move {
-            // hCaptcha token from the DOM (widget should be on the page)
-            let hcaptcha_token = window()
-                .and_then(|w| w.document())
-                .and_then(|d| d.get_element_by_id("hcaptcha-response"))
-                .and_then(|el| el.dyn_into::<HtmlInputElement>().ok())
-                .map(|inp| inp.value())
-                .unwrap_or_default();
-
-            let mut body = json!({
-                "username": user,
-                "password": pass,
-                "hcaptcha_token": hcaptcha_token,
-            });
-            if !totp_code.is_empty() {
-                body["totp_code"] = json!(totp_code);
-            }
-
-            match api::admin_post("/admin/api/auth/login", &body).await {
-                Ok(resp) => {
-                    if resp["totp_required"].as_bool().unwrap_or(false) {
-                        set_totp_required.set(true);
-                    } else if let Some(token) = resp["session_token"].as_str() {
-                        storage::set_admin_session(token);
-                        nav("/admin", Default::default());
-                    } else {
-                        set_error.set(Some("Unexpected response".into()));
-                    }
+    let login = Action::new_local(move |_: &()| {
+        let username = username.get();
+        let password = password.get();
+        let totp = totp.get();
+        let navigate = navigate.clone();
+        async move {
+            let captcha = window().and_then(|win| win.document()).and_then(|document| document.get_element_by_id("hcaptcha-response")).and_then(|node| node.dyn_into::<HtmlInputElement>().ok()).map(|input| input.value()).unwrap_or_default();
+            let mut body = serde_json::json!({ "username": username, "password": password, "hcaptcha_token": captcha });
+            if !totp.is_empty() { body["totp_code"] = serde_json::json!(totp); }
+            match api::admin_post_json::<_, serde_json::Value>("/admin/api/auth/login", &body).await {
+                Ok(response) => {
+                    if response["totp_required"].as_bool().unwrap_or(false) { set_totp_required.set(true); set_error.set(Some("Enter your TOTP code to continue.".to_string())); }
+                    else if let Some(token) = response["session_token"].as_str() { storage::set_admin_session(token); set_error.set(None); navigate("/admin/dashboard", Default::default()); }
+                    else { set_error.set(Some("Unexpected admin login response.".to_string())); }
                 }
-                Err(e) => set_error.set(Some(e)),
+                Err(message) => set_error.set(Some(message)),
             }
-            set_loading.set(false);
-        });
-    };
+        }
+    });
 
     view! {
         <div class="center-page">
             <div class="auth-card">
-                <div class="auth-title">"Admin Login"</div>
-
-                <div class="form-group">
-                    <label class="form-label">"Username"</label>
-                    <input class="form-input" type="text"
-                        prop:value=move || username.get()
-                        on:input=move |ev| set_username.set(event_target_value(&ev))
-                    />
+                <div class="auth-title">"Admin Console"</div>
+                <div class="auth-subtitle">"Protected access for platform operations."</div>
+                <div class="form-grid">
+                    <div><label class="label">"Username"</label><input class="input" type="text" prop:value=move || username.get() on:input=move |event| set_username.set(event_target_value(&event)) /></div>
+                    <div><label class="label">"Password"</label><input class="input" type="password" prop:value=move || password.get() on:input=move |event| set_password.set(event_target_value(&event)) /></div>
+                    <div class="h-captcha" data-sitekey="HCAPTCHA_SITE_KEY"></div>
+                    <input type="hidden" id="hcaptcha-response" />
+                    {move || if totp_required.get() { view! { <div><label class="label">"TOTP"</label><input class="input" type="text" maxlength="6" prop:value=move || totp.get() on:input=move |event| set_totp.set(event_target_value(&event)) /></div> }.into_any() } else { view! { <></> }.into_any() }}
                 </div>
-                <div class="form-group">
-                    <label class="form-label">"Password"</label>
-                    <input class="form-input" type="password"
-                        prop:value=move || password.get()
-                        on:input=move |ev| set_password.set(event_target_value(&ev))
-                    />
-                </div>
-
-                // hCaptcha widget (rendered by the external script in index.html)
-                <div class="h-captcha" data-sitekey="HCAPTCHA_SITE_KEY" style="margin:12px 0;"></div>
-                // Hidden input that hCaptcha SDK fills in:
-                <input type="hidden" id="hcaptcha-response"/>
-
-                <Show when=move || totp_required.get()>
-                    <div class="form-group">
-                        <label class="form-label">"Authenticator code"</label>
-                        <input class="form-input" type="text" maxlength="6"
-                            placeholder="6-digit code"
-                            prop:value=move || totp.get()
-                            on:input=move |ev| set_totp.set(event_target_value(&ev))
-                        />
-                    </div>
-                </Show>
-
-                {move || error.get().map(|e| view! { <div class="form-error">{e}</div> })}
-
-                <button class="btn-primary"
-                    disabled=move || loading.get()
-                    on:click=do_login>
-                    {move || if loading.get() { "Signing in…" } else { "Sign In" }}
-                </button>
+                {move || error.get().map(|message| view! { <div class="form-error">{message}</div> })}
+                <button class="btn-primary" style="width: 100%; margin-top: 18px;" disabled=move || login.pending().get() on:click=move |_| { login.dispatch_local(()); }>{move || if login.pending().get() { "Signing in…" } else { "Sign In" }}</button>
             </div>
         </div>
     }

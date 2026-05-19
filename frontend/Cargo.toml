@@ -21,6 +21,8 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 web-sys = { version = "0.3", features = [
   "Window",
+  "Document",
+  "Element",
   "Location",
   "Navigator",
   "Clipboard",
@@ -32,12 +34,10 @@ web-sys = { version = "0.3", features = [
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# WASM-safe randomness — must be declared before all crypto crates
 getrandom = { version = "0.2", features = ["js"] }
 rand = { version = "0.8", features = ["getrandom"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 
-# Crypto
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 x25519-dalek  = { version = "2", features = ["static_secrets"] }
 snow          = { version = "0.9", default-features = false, features = ["default-resolver"] }

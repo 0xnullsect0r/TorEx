@@ -1,203 +1,85 @@
 use leptos::prelude::*;
-use serde_json::json;
+use serde_json::Value;
 use web_sys::window;
 
-use crate::core::api;
 use crate::components::nav::Nav;
+use crate::core::{api, storage};
+use crate::core::types::{Balance, DepositAddressResponse, WalletHistoryResponse, WalletTransaction};
 
-const CHAINS: &[(&str, &str)] = &[
-    ("tron", "TRC-20 (TRON)"),
-    ("eth",  "ERC-20 (Ethereum)"),
-    ("bsc",  "BEP-20 (BSC)"),
-];
+const CHAINS: [&str; 3] = ["TRC-20", "ERC-20", "BEP-20"];
 
 #[component]
-pub fn Wallet() -> impl IntoView {
-    let (pair, set_pair) = create_signal("BTC/USDT".to_string());
-    let (balance, set_balance) = create_signal("0.00".to_string());
-    let (chain, set_chain) = create_signal("tron".to_string());
-    let (deposit_addr, set_deposit_addr) = create_signal(Option::<String>::None);
-    let (withdraw_addr, set_withdraw_addr) = create_signal(String::new());
-    let (withdraw_amount, set_withdraw_amount) = create_signal(String::new());
-    let (withdraw_error, set_withdraw_error) = create_signal(Option::<String>::None);
-    let (withdraw_ok, set_withdraw_ok) = create_signal(false);
-    let (loading_deposit, set_loading_deposit) = create_signal(false);
-    let (loading_withdraw, set_loading_withdraw) = create_signal(false);
+pub fn WalletPage() -> impl IntoView {
+    let (balance, set_balance) = signal(0.0_f64);
+    let (deposit_chain, set_deposit_chain) = signal(CHAINS[0].to_string());
+    let (withdraw_chain, set_withdraw_chain) = signal(CHAINS[0].to_string());
+    let (deposit_address, set_deposit_address) = signal(None::<DepositAddressResponse>);
+    let (withdraw_address, set_withdraw_address) = signal(String::new());
+    let (withdraw_amount, set_withdraw_amount) = signal(String::new());
+    let (transactions, set_transactions) = signal(Vec::<WalletTransaction>::new());
+    let (message, set_message) = signal(None::<String>);
+    let (error, set_error) = signal(None::<String>);
+    let user_id = Signal::derive(storage::get_user_id);
 
-    // Load balance on mount
-    Effect::new(move || {
-        wasm_bindgen_futures::spawn_local(async move {
-            if let Ok(v) = api::get("/api/wallet/balance").await {
-                let usdt = v["usdt"].as_str().unwrap_or("0.00").to_string();
-                set_balance.set(usdt);
-            }
-        });
+    let refresh_wallet = Action::new_local(move |_: &()| async move {
+        if let Ok(balance_response) = api::get_json::<Balance>("/api/wallet/balance").await { set_balance.set(balance_response.usdt); }
+        if let Ok(history) = api::get_json::<WalletHistoryResponse>("/api/wallet/history").await {
+            let mut rows = history.deposits;
+            rows.extend(history.withdrawals);
+            rows.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+            rows.truncate(40);
+            set_transactions.set(rows);
+        }
     });
 
-    let get_deposit = move |_| {
-        let ch = chain.get();
-        set_loading_deposit.set(true);
-        set_deposit_addr.set(None);
-        wasm_bindgen_futures::spawn_local(async move {
-            let body = json!({ "chain": ch });
-            if let Ok(v) = api::post_json("/api/wallet/deposit-address", &body).await {
-                if let Some(addr) = v["address"].as_str() {
-                    set_deposit_addr.set(Some(addr.to_string()));
-                }
-            }
-            set_loading_deposit.set(false);
-        });
-    };
-
-    let do_withdraw = move |_| {
-        let addr = withdraw_addr.get();
-        let amt = withdraw_amount.get();
-        let ch = chain.get();
-        set_withdraw_error.set(None);
-        set_withdraw_ok.set(false);
-        if addr.is_empty() || amt.is_empty() {
-            set_withdraw_error.set(Some("Address and amount are required".into()));
-            return;
-        }
-        let amount: f64 = match amt.parse() {
-            Ok(v) => v,
-            Err(_) => {
-                set_withdraw_error.set(Some("Invalid amount".into()));
-                return;
-            }
-        };
-        set_loading_withdraw.set(true);
-        wasm_bindgen_futures::spawn_local(async move {
-            let body = json!({
-                "dest_address": addr,
-                "amount": amount,
-                "chain": ch,
-                "zk_proof": vec![0u8; 32],
-            });
-            match api::post_json("/api/wallet/withdraw", &body).await {
-                Ok(_) => {
-                    set_withdraw_ok.set(true);
-                    set_withdraw_addr.set(String::new());
-                    set_withdraw_amount.set(String::new());
-                }
-                Err(e) => set_withdraw_error.set(Some(e)),
-            }
-            set_loading_withdraw.set(false);
-        });
-    };
-
-    let copy_addr = move |_| {
-        if let Some(addr) = deposit_addr.get() {
-            if let Some(win) = window() {
-                let _ = win.navigator().clipboard().write_text(&addr);
+    let generate_address = Action::new_local(move |chain: &String| {
+        let chain = chain.clone();
+        async move {
+            let body = serde_json::json!({ "chain": chain });
+            match api::post_json::<_, DepositAddressResponse>("/api/wallet/deposit-address", &body).await {
+                Ok(response) => { set_deposit_address.set(Some(response)); set_error.set(None); }
+                Err(message) => set_error.set(Some(message)),
             }
         }
-    };
+    });
+
+    let withdraw_action = Action::new_local(move |_: &()| {
+        let chain = withdraw_chain.get();
+        let address = withdraw_address.get();
+        let amount = withdraw_amount.get();
+        async move {
+            let parsed_amount = match amount.parse::<f64>() { Ok(value) if value > 0.0 => value, _ => { set_error.set(Some("Enter a valid withdrawal amount.".to_string())); return; } };
+            let body = serde_json::json!({ "chain": chain, "dest_address": address, "amount": parsed_amount });
+            match api::post_json::<_, Value>("/api/wallet/withdraw", &body).await {
+                Ok(_) => { set_message.set(Some("Withdrawal submitted.".to_string())); set_error.set(None); set_withdraw_address.set(String::new()); set_withdraw_amount.set(String::new()); refresh_wallet.dispatch_local(()); }
+                Err(message) => set_error.set(Some(message)),
+            }
+        }
+    });
+
+    Effect::new(move |_| { refresh_wallet.dispatch_local(()); });
 
     view! {
-        <Nav pair=pair set_pair=set_pair pairs=&["BTC/USDT"]/>
-        <div class="page">
-            <div style="max-width:520px;margin:0 auto;">
-
-                // Balance
-                <div class="card">
-                    <div class="card-title">"Balance"</div>
-                    <div class="balance-big">{move || format!("{} USDT", balance.get())}</div>
-                    <button class="btn-primary" style="width:auto;padding:4px 12px;font-size:11px;"
-                        on:click=move |_| {
-                            wasm_bindgen_futures::spawn_local(async move {
-                                if let Ok(v) = api::get("/api/wallet/balance").await {
-                                    let u = v["usdt"].as_str().unwrap_or("0.00").to_string();
-                                    set_balance.set(u);
-                                }
-                            });
-                        }>
-                        "Refresh"
-                    </button>
-                </div>
-
-                // Chain selector
-                <div class="flex gap-8 mt-12">
-                    <span class="text-muted">"Chain:"</span>
-                    <select class="chain-select"
-                        on:change=move |ev| {
-                            set_chain.set(event_target_value(&ev));
-                            set_deposit_addr.set(None);
-                        }>
-                        {CHAINS.iter().map(|(val, label)| view! {
-                            <option value=*val>{*label}</option>
-                        }).collect::<Vec<_>>()}
-                    </select>
-                </div>
-
-                // Deposit
-                <div class="card mt-12">
-                    <div class="card-title">"Deposit"</div>
-                    <Show when=move || deposit_addr.get().is_none()>
-                        <button class="btn-primary"
-                            disabled=move || loading_deposit.get()
-                            on:click=get_deposit>
-                            {move || if loading_deposit.get() {
-                                "Generating…"
-                            } else {
-                                "Generate Deposit Address"
-                            }}
-                        </button>
-                    </Show>
-                    {move || deposit_addr.get().map(|addr| {
-                        let addr2 = addr.clone();
-                        view! {
-                            <div>
-                                <div class="qr-container">
-                                    // Simple text QR placeholder — real QR needs a JS lib or pure-Rust impl
-                                    <div style="width:160px;height:160px;display:flex;align-items:center;
-                                                justify-content:center;background:#fff;color:#000;
-                                                font-size:9px;word-break:break-all;padding:4px;">
-                                        {addr.clone()}
-                                    </div>
-                                </div>
-                                <div class="address-text" on:click=copy_addr>{addr2}</div>
-                                <div class="text-muted mt-8" style="font-size:11px;">
-                                    "This stealth address expires in 48 hours. Click address to copy."
-                                </div>
-                            </div>
-                        }
-                    })}
-                </div>
-
-                // Withdraw
-                <div class="card mt-12">
-                    <div class="card-title">"Withdraw"</div>
-                    <div class="form-group">
-                        <label class="form-label">"Destination address"</label>
-                        <input class="form-input" type="text"
-                            prop:value=move || withdraw_addr.get()
-                            on:input=move |ev| set_withdraw_addr.set(event_target_value(&ev))
-                        />
+        <div class="shell">
+            <Nav connected=Signal::derive(|| false) show_admin=Signal::derive(|| storage::get_admin_session().is_some()) user_id=user_id />
+            <div class="page-wide">
+                <div class="wallet-grid">
+                    <div class="left-stack">
+                        <section class="panel"><div class="panel-header"><div><div class="panel-title">"Wallet Overview"</div><div class="text-muted">"Private settlement balance"</div></div><button class="btn-ghost btn-small" on:click=move |_| { refresh_wallet.dispatch_local(()); }>"Refresh"</button></div><div class="panel-body balance-hero"><span class="label">"Available Balance"</span><span class="balance-value">{move || format!("{:.2} USDT", balance.get())}</span><span class="text-muted">"Deposit, withdraw, and monitor settlement history."</span></div></section>
+                        <section class="panel"><div class="panel-header"><div><div class="panel-title">"Deposit"</div><div class="text-muted">"Generate a fresh address per chain."</div></div></div><div class="panel-body form-grid"><div><label class="label">"Chain"</label><select class="select" prop:value=move || deposit_chain.get() on:change=move |event| set_deposit_chain.set(event_target_value(&event))>{CHAINS.into_iter().map(|chain| view! { <option value=chain>{chain}</option> }).collect::<Vec<_>>()}</select></div><button class="btn-primary" on:click=move |_| { generate_address.dispatch_local(deposit_chain.get()); } disabled=move || generate_address.pending().get()>{move || if generate_address.pending().get() { "Generating…" } else { "Generate Address" }}</button>{move || if let Some(address) = deposit_address.get() { let display_value = address.address.clone(); let copy_value = display_value.clone(); view! { <div class="two-column"><div class="qr-placeholder"></div><div class="form-grid"><div><span class="label">"Deposit Address"</span><div class="address-box">{display_value}</div></div><button class="btn-ghost" on:click=move |_| copy_to_clipboard(&copy_value)>"Copy Address"</button><div class="placeholder-note">"QR placeholder shown here. Address is ready to use now."</div></div></div> }.into_any() } else { view! { <div class="placeholder-note">"Select a chain and generate a deposit address."</div> }.into_any() }}</div></section>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">"Amount (USDT)"</label>
-                        <input class="form-input" type="number" step="0.01"
-                            prop:value=move || withdraw_amount.get()
-                            on:input=move |ev| set_withdraw_amount.set(event_target_value(&ev))
-                        />
+                    <div class="right-stack">
+                        <section class="panel"><div class="panel-header"><div><div class="panel-title">"Withdraw"</div><div class="text-muted">"Submit a withdrawal request with estimated fee preview."</div></div></div><div class="panel-body form-grid"><div><label class="label">"Chain"</label><select class="select" prop:value=move || withdraw_chain.get() on:change=move |event| set_withdraw_chain.set(event_target_value(&event))>{CHAINS.into_iter().map(|chain| view! { <option value=chain>{chain}</option> }).collect::<Vec<_>>()}</select></div><div><label class="label">"Destination Address"</label><input class="input mono" type="text" prop:value=move || withdraw_address.get() on:input=move |event| set_withdraw_address.set(event_target_value(&event)) /></div><div><label class="label">"Amount"</label><input class="input mono" type="number" step="0.0001" prop:value=move || withdraw_amount.get() on:input=move |event| set_withdraw_amount.set(event_target_value(&event)) /></div><div class="order-summary mono"><div class="summary-row"><span class="text-muted">"Estimated fee"</span><span>{move || format!("{:.4} USDT", withdraw_amount.get().parse::<f64>().unwrap_or(0.0) * 0.0015)}</span></div><div class="summary-row"><span class="text-muted">"Net amount"</span><span>{move || { let gross = withdraw_amount.get().parse::<f64>().unwrap_or(0.0); let fee = gross * 0.0015; format!("{:.4} USDT", (gross - fee).max(0.0)) }}</span></div></div><button class="btn-primary" on:click=move |_| { withdraw_action.dispatch_local(()); } disabled=move || withdraw_action.pending().get()>{move || if withdraw_action.pending().get() { "Submitting…" } else { "Submit Withdrawal" }}</button></div></section>
+                        <section class="panel"><div class="panel-header"><div class="panel-title">"Transaction History"</div><div class="text-muted">"Last 20 deposits and withdrawals"</div></div><div class="panel-body"><table class="data-table mono"><thead><tr><th>"Type"</th><th>"Chain"</th><th>"Amount"</th><th>"Fee"</th><th>"Status"</th><th>"Time"</th></tr></thead><tbody>{move || { let rows = transactions.get().into_iter().take(40).collect::<Vec<_>>(); if rows.is_empty() { view! { <tr><td colspan="6" class="text-muted">"No transactions available yet."</td></tr> }.into_any() } else { view! { <>{rows.into_iter().map(|tx| view! { <tr><td>{tx.tx_type}</td><td>{tx.chain}</td><td>{format!("{:.4}", tx.amount)}</td><td>{format!("{:.4}", tx.fee)}</td><td>{tx.status}</td><td>{tx.created_at}</td></tr> }).collect::<Vec<_>>()}</> }.into_any() } }}</tbody></table></div></section>
                     </div>
-                    {move || withdraw_error.get().map(|e| view! {
-                        <div class="form-error">{e}</div>
-                    })}
-                    {move || withdraw_ok.get().then(|| view! {
-                        <div style="color:var(--buy);font-size:12px;margin-bottom:8px;">
-                            "Withdrawal submitted successfully."
-                        </div>
-                    })}
-                    <button class="btn-primary"
-                        disabled=move || loading_withdraw.get()
-                        on:click=do_withdraw>
-                        {move || if loading_withdraw.get() { "Submitting…" } else { "Withdraw USDT" }}
-                    </button>
                 </div>
-
+                {move || message.get().map(|message| view! { <div class="form-success">{message}</div> })}
+                {move || error.get().map(|message| view! { <div class="form-error">{message}</div> })}
             </div>
         </div>
     }
+}
+
+fn copy_to_clipboard(value: &str) {
+    if let Some(clipboard) = window().and_then(|window| window.navigator().clipboard()) { let _ = clipboard.write_text(value); }
 }

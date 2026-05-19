@@ -1,38 +1,38 @@
 use leptos::prelude::*;
 use leptos_router::components::A;
 
-const PAIRS: &[&str] = &[
-    "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT",
-    "DOGE/USDT", "ADA/USDT", "AVAX/USDT", "DOT/USDT", "MATIC/USDT",
-    "LTC/USDT", "SHIB/USDT", "TRX/USDT", "LINK/USDT", "UNI/USDT",
-    "ATOM/USDT", "XLM/USDT", "BCH/USDT", "FIL/USDT", "APT/USDT",
-];
+use crate::core::storage;
+use crate::core::types::{Theme, short_id};
 
 #[component]
 pub fn Nav(
-    pair: ReadSignal<String>,
-    set_pair: WriteSignal<String>,
-    #[prop(optional)] pairs: Option<&'static [&'static str]>,
+    #[prop(optional, into)] connected: Option<Signal<bool>>,
+    #[prop(optional, into)] show_admin: Option<Signal<bool>>,
+    #[prop(optional, into)] user_id: Option<Signal<Option<String>>>,
 ) -> impl IntoView {
-    let pair_list = pairs.unwrap_or(PAIRS);
+    let (theme, set_theme) = signal(storage::get_theme());
+
+    let is_connected = move || connected.map(|signal| signal.get()).unwrap_or(false);
+    let admin_visible = move || show_admin.map(|signal| signal.get()).unwrap_or(storage::get_admin_session().is_some());
+    let user_label = move || user_id.and_then(|signal| signal.get()).or_else(storage::get_user_id).map(|value| short_id(&value)).unwrap_or_else(|| "guest".to_string());
+
     view! {
         <nav class="top-nav">
-            <div class="nav-logo">
-                <A href="/trading">"TorEx"</A>
-            </div>
-
-            <select class="pair-select"
-                prop:value=move || pair.get()
-                on:change=move |ev| set_pair.set(event_target_value(&ev))>
-                {pair_list.iter().map(|p| view! {
-                    <option value=*p>{*p}</option>
-                }).collect::<Vec<_>>()}
-            </select>
-
+            <A href="/trade" class="brand">
+                <span class="brand-mark">"T"</span>
+                <span class="brand-name">"TorEx"</span>
+            </A>
             <div class="nav-links">
-                <A href="/trading">"Trade"</A>
-                <A href="/wallet">"Wallet"</A>
-                <A href="/admin/login">"Admin"</A>
+                <A href="/trade" class="nav-link">"Trade"</A>
+                <A href="/wallet" class="nav-link">"Wallet"</A>
+                {move || if admin_visible() { view! { <A href="/admin/dashboard" class="nav-link">"Admin"</A> }.into_any() } else { view! { <A href="/admin" class="nav-link">"Admin"</A> }.into_any() }}
+            </div>
+            <div class="nav-actions">
+                <div class="connection-pill"><span class=move || if is_connected() { "status-dot online" } else { "status-dot" }></span><span>{move || if is_connected() { "Realtime connected" } else { "Offline" }}</span></div>
+                <select class="theme-select" prop:value=move || theme.get().as_str().to_string() on:change=move |event| { let next = Theme::from(event_target_value(&event)); set_theme.set(next); storage::set_theme(next); }>
+                    {Theme::all().into_iter().map(|candidate| view! { <option value=candidate.as_str()>{candidate.label()}</option> }).collect::<Vec<_>>()}
+                </select>
+                <div class="user-pill"><span class="text-muted">"User"</span><span>{user_label}</span></div>
             </div>
         </nav>
     }

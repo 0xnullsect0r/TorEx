@@ -2,61 +2,47 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
 
 use crate::core::{api, crypto, storage};
+use crate::core::types::RegisterResponse;
 
 #[component]
 pub fn Onboarding() -> impl IntoView {
-    let (show_import, set_show_import) = create_signal(false);
-    let (generated, set_generated) = create_signal(crypto::generate_mnemonic());
-    let (confirmed, set_confirmed) = create_signal(false);
-    let (import_val, set_import_val) = create_signal(String::new());
-    let (error, set_error) = create_signal(Option::<String>::None);
-    let (loading, set_loading) = create_signal(false);
-
+    let (mode, set_mode) = signal("create".to_string());
+    let (generated, set_generated) = signal(crypto::generate_mnemonic());
+    let (confirmed, set_confirmed) = signal(false);
+    let (import_value, set_import_value) = signal(String::new());
+    let (error, set_error) = signal(None::<String>);
     let navigate = use_navigate();
 
-    let register = Action::new_local({
+    let register = Action::new_local(move |mnemonic: &String| {
+        let mnemonic = mnemonic.clone();
         let navigate = navigate.clone();
-        move |mnemonic: &String| {
-            let mnemonic = mnemonic.clone();
-            let navigate = navigate.clone();
-            async move {
-                if !crypto::validate_mnemonic(&mnemonic) {
-                    set_error.set(Some("Invalid recovery phrase".into()));
-                    return;
+        async move {
+            if !crypto::validate_mnemonic(&mnemonic) {
+                set_error.set(Some("Recovery phrase is invalid.".to_string()));
+                return;
+            }
+            let Some(keys) = crypto::keys_from_mnemonic(&mnemonic) else {
+                set_error.set(Some("Failed to derive account keys.".to_string()));
+                return;
+            };
+            let pubkey_bytes: [u8; 32] = hex::decode(&keys.pubkey_hex).ok().and_then(|bytes| bytes.try_into().ok()).unwrap_or([0u8; 32]);
+            let (signature, timestamp) = crypto::sign_registration(&keys.signing_key, &pubkey_bytes);
+            let body = serde_json::json!({
+                "pubkey": keys.pubkey_hex,
+                "view_pubkey": keys.view_pubkey_hex,
+                "spend_pubkey": keys.spend_pubkey_hex,
+                "signature": signature,
+                "timestamp": timestamp,
+            });
+            match api::post_json::<_, RegisterResponse>("/api/auth/register", &body).await {
+                Ok(response) => {
+                    storage::set_mnemonic(&mnemonic);
+                    if !response.session_id.is_empty() { storage::set_session_id(&response.session_id); }
+                    if !response.user_id.is_empty() { storage::set_user_id(&response.user_id); }
+                    set_error.set(None);
+                    navigate("/trade", Default::default());
                 }
-                let Some(keys) = crypto::keys_from_mnemonic(&mnemonic) else {
-                    set_error.set(Some("Key derivation failed".into()));
-                    return;
-                };
-                set_loading.set(true);
-                set_error.set(None);
-
-                let pubkey_bytes: [u8; 32] = hex::decode(&keys.pubkey_hex)
-                    .ok()
-                    .and_then(|b| b.try_into().ok())
-                    .unwrap_or([0u8; 32]);
-                let (sig_hex, timestamp) = crypto::sign_registration(&keys.signing_key, &pubkey_bytes);
-
-                let body = serde_json::json!({
-                    "pubkey":       keys.pubkey_hex,
-                    "view_pubkey":  keys.view_pubkey_hex,
-                    "spend_pubkey": keys.spend_pubkey_hex,
-                    "signature":    sig_hex,
-                    "timestamp":    timestamp,
-                });
-                match api::post_json("/api/auth/register", &body).await {
-                    Ok(resp) => {
-                        if let Some(sid) = resp["session_id"].as_str() {
-                            storage::set_session_id(sid);
-                            storage::set_mnemonic(&mnemonic);
-                            navigate("/trading", Default::default());
-                        } else {
-                            set_error.set(Some("No session_id in response".into()));
-                        }
-                    }
-                    Err(e) => set_error.set(Some(e)),
-                }
-                set_loading.set(false);
+                Err(message) => set_error.set(Some(message)),
             }
         }
     });
@@ -64,99 +50,45 @@ pub fn Onboarding() -> impl IntoView {
     view! {
         <div class="center-page">
             <div class="auth-card">
-                <div class="auth-title">"TorEx"</div>
-                <div class="auth-sub">"Privacy-first USDT exchange · Tor hidden service"</div>
-
-                <Show when=move || !show_import.get()>
-                    <div class="card-title">"Your recovery phrase"</div>
-                    <p class="text-muted" style="font-size:11px;margin-bottom:12px;">
-                        "Write these 24 words down. They are your identity — no email, no password."
-                    </p>
-
-                    <MnemonicGrid mnemonic=generated.get()/>
-
-                    <div class="flex gap-8 mt-12">
-                        <input
-                            type="checkbox"
-                            id="confirm-cb"
-                            prop:checked=move || confirmed.get()
-                            on:change=move |_| set_confirmed.update(|v| *v = !*v)
-                        />
-                        <label for="confirm-cb" style="font-size:12px;">
-                            "I have written down my recovery phrase"
-                        </label>
-                    </div>
-
-                    <button
-                        class="btn-primary mt-16"
-                        disabled=move || !confirmed.get() || loading.get()
-                        on:click=move |_| { register.dispatch_local(generated.get()); }
-                    >
-                        {move || if loading.get() { "Creating…" } else { "Create Wallet" }}
-                    </button>
-                    <button
-                        class="btn-primary mt-8"
-                        style="background:transparent;color:var(--muted);border:1px solid var(--border);"
-                        on:click=move |_| set_show_import.set(true)
-                    >
-                        "Import existing wallet"
-                    </button>
-                </Show>
-
-                <Show when=move || show_import.get()>
-                    <div class="card-title">"Import wallet"</div>
-                    <div class="form-group">
-                        <textarea
-                            class="form-input"
-                            rows="4"
-                            placeholder="Enter your 24-word recovery phrase…"
-                            prop:value=move || import_val.get()
-                            on:input=move |ev| set_import_val.set(event_target_value(&ev))
-                        />
-                    </div>
-                    <button
-                        class="btn-primary"
-                        disabled=move || loading.get()
-                        on:click=move |_| { register.dispatch_local(import_val.get().trim().to_string()); }
-                    >
-                        {move || if loading.get() { "Importing…" } else { "Import Wallet" }}
-                    </button>
-                    <button
-                        class="btn-primary mt-8"
-                        style="background:transparent;color:var(--muted);border:1px solid var(--border);"
-                        on:click=move |_| { set_show_import.set(false); set_error.set(None); }
-                    >
-                        "← Back"
-                    </button>
-                </Show>
-
-                {move || error.get().map(|e| view! {
-                    <div class="form-error mt-8">{e}</div>
-                })}
+                <div class="auth-title">"TorEx Trading Platform"</div>
+                <div class="auth-subtitle">"Create or import your private trading identity."</div>
+                <div class="tab-row" style="margin-bottom: 18px;">
+                    <button class=move || if mode.get() == "create" { "tab-button active" } else { "tab-button" } on:click=move |_| set_mode.set("create".to_string())>"Create Account"</button>
+                    <button class=move || if mode.get() == "import" { "tab-button active" } else { "tab-button" } on:click=move |_| set_mode.set("import".to_string())>"Import Account"</button>
+                </div>
+                {move || if mode.get() == "create" {
+                    view! {
+                        <>
+                            <div class="label">"Recovery Phrase"</div>
+                            <div class="text-muted">"Write this down. It controls your account and cannot be recovered."</div>
+                            <MnemonicGrid mnemonic=generated />
+                            <div class="inline-actions" style="justify-content: space-between; margin: 14px 0 18px;">
+                                <label class="inline-actions"><input type="checkbox" prop:checked=move || confirmed.get() on:change=move |_| set_confirmed.update(|value| *value = !*value) /><span>I saved my phrase securely.</span></label>
+                                <button class="btn-ghost btn-small" on:click=move |_| { set_generated.set(crypto::generate_mnemonic()); set_confirmed.set(false); }>"Regenerate"</button>
+                            </div>
+                            <button class="btn-primary" style="width: 100%;" disabled=move || !confirmed.get() || register.pending().get() on:click=move |_| { register.dispatch_local(generated.get()); }>{move || if register.pending().get() { "Creating…" } else { "Create Wallet" }}</button>
+                        </>
+                    }.into_any()
+                } else {
+                    view! {
+                        <>
+                            <label class="label">"Import Recovery Phrase"</label>
+                            <textarea class="textarea" placeholder="Enter your 24-word recovery phrase" prop:value=move || import_value.get() on:input=move |event| set_import_value.set(event_target_value(&event))></textarea>
+                            <button class="btn-primary" style="width: 100%; margin-top: 16px;" disabled=move || register.pending().get() on:click=move |_| { register.dispatch_local(import_value.get().trim().to_string()); }>{move || if register.pending().get() { "Importing…" } else { "Import Wallet" }}</button>
+                        </>
+                    }.into_any()
+                }}
+                {move || error.get().map(|message| view! { <div class="form-error">{message}</div> })}
             </div>
         </div>
     }
 }
 
 #[component]
-fn MnemonicGrid(mnemonic: String) -> impl IntoView {
-    let words: Vec<(usize, String)> = mnemonic
-        .split_whitespace()
-        .enumerate()
-        .map(|(i, w)| (i + 1, w.to_string()))
-        .collect();
+fn MnemonicGrid(mnemonic: ReadSignal<String>) -> impl IntoView {
     view! {
         <div class="mnemonic-grid">
-            <For
-                each=move || words.clone()
-                key=|(i, _)| *i
-                children=move |(n, word)| view! {
-                    <div class="mnemonic-word">
-                        <span class="mnemonic-num">{n}"."</span>
-                        <span class="mnemonic-text">{word}</span>
-                    </div>
-                }
-            />
+            {move || mnemonic.get().split_whitespace().enumerate().map(|(index, word)| view! { <div class="mnemonic-word"><span class="mnemonic-index">{format!("{:02}", index + 1)}</span><span class="mono">{word.to_string()}</span></div> }).collect::<Vec<_>>()}
         </div>
     }
 }
