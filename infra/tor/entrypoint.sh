@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 set -e
 
 ONION_DIR=/var/lib/tor/hidden_service
