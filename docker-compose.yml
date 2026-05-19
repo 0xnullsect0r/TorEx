@@ -21,7 +21,7 @@ x-logging: &default-logging
 services:
   nginx:
     build:
-      context: ./nginx
+      context: ./frontend
       network: host
     ports:
       - "80:80"
@@ -32,7 +32,7 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      - ./frontend/build/web:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
