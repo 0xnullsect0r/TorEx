@@ -38,7 +38,7 @@ RUN cargo build --release --bin torex
 # Avoids BuildKit cache mount sharing conflicts with concurrent build stages.
 FROM alpine:3.21 AS runtime
 RUN printf 'http://dl-cdn.alpinelinux.org/alpine/v3.21/main\nhttp://dl-cdn.alpinelinux.org/alpine/v3.21/community\n' > /etc/apk/repositories \
-    && apk add --no-cache ca-certificates
+    && apk add --no-cache ca-certificates wget
 COPY --from=builder /app/target/release/torex /torex
 EXPOSE 8080
 ENTRYPOINT ["/torex"]
