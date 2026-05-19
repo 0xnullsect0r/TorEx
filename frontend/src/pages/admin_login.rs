@@ -1,7 +1,5 @@
 use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
-use wasm_bindgen::JsCast;
-use web_sys::{HtmlInputElement, window};
 
 use crate::core::{api, storage};
 
@@ -20,8 +18,8 @@ pub fn AdminLogin() -> impl IntoView {
         let totp = totp.get();
         let navigate = navigate.clone();
         async move {
-            let captcha = window().and_then(|win| win.document()).and_then(|document| document.get_element_by_id("hcaptcha-response")).and_then(|node| node.dyn_into::<HtmlInputElement>().ok()).map(|input| input.value()).unwrap_or_default();
-            let mut body = serde_json::json!({ "username": username, "password": password, "hcaptcha_token": captcha });
+            // hCaptcha is disabled for Tor hidden service (external captcha = privacy leak)
+            let mut body = serde_json::json!({ "username": username, "password": password, "hcaptcha_token": "bypass" });
             if !totp.is_empty() { body["totp_code"] = serde_json::json!(totp); }
             match api::admin_post_json::<_, serde_json::Value>("/admin/api/auth/login", &body).await {
                 Ok(response) => {
@@ -42,8 +40,6 @@ pub fn AdminLogin() -> impl IntoView {
                 <div class="form-grid">
                     <div><label class="label">"Username"</label><input class="input" type="text" prop:value=move || username.get() on:input=move |event| set_username.set(event_target_value(&event)) /></div>
                     <div><label class="label">"Password"</label><input class="input" type="password" prop:value=move || password.get() on:input=move |event| set_password.set(event_target_value(&event)) /></div>
-                    <div class="h-captcha" data-sitekey="HCAPTCHA_SITE_KEY"></div>
-                    <input type="hidden" id="hcaptcha-response" />
                     {move || if totp_required.get() { view! { <div><label class="label">"TOTP"</label><input class="input" type="text" maxlength="6" prop:value=move || totp.get() on:input=move |event| set_totp.set(event_target_value(&event)) /></div> }.into_any() } else { view! { <></> }.into_any() }}
                 </div>
                 {move || error.get().map(|message| view! { <div class="form-error">{message}</div> })}
