@@ -36,7 +36,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
       interval: 10s
       timeout: 5s
       retries: 6
