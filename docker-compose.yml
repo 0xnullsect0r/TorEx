@@ -148,7 +148,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ["CMD", "vault", "status"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8200/v1/sys/health?standbyok=true&sealedok=true&uninitok=true"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -212,6 +212,7 @@ services:
 
   loki:
     image: grafana/loki:2.9.8
+    user: root
     networks:
       - internal
     volumes:
