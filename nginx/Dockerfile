@@ -1,6 +1,6 @@
 # Stage 1: Build Leptos/WASM frontend with trunk
-# Pinned to rust:1.88 — wasm-bindgen-cli 0.2.121 (matching Cargo.lock) requires
-# rustc ≥1.88 (its dependency time@0.3.47 has MSRV 1.88.0).
+# Use rust:1.88 — the release-concurrent stable with wasm-bindgen 0.2.121 (released 2026-05-07).
+# Using a newer Rust (e.g. rust:1) triggered clone_ref errors in wasm-bindgen-cli processing.
 FROM rust:1.88 AS builder
 
 RUN rustup target add wasm32-unknown-unknown
@@ -8,10 +8,13 @@ RUN curl -fsSL \
     https://github.com/trunk-rs/trunk/releases/download/v0.21.14/trunk-x86_64-unknown-linux-gnu.tar.gz \
     | tar xz -C /usr/local/bin/
 
-# Install wasm-bindgen-cli exactly matching the crate version in Cargo.lock (0.2.121).
-# Trunk will find this in PATH and use it instead of any bundled/downloaded version.
-# Requires rust ≥1.88 (wasm-bindgen-cli's dep time@0.3.47 has MSRV 1.88.0).
-RUN cargo install wasm-bindgen-cli --version 0.2.121 --locked
+# Download the official pre-built wasm-bindgen-cli 0.2.121 binary (x86_64 musl).
+# Using a pre-built binary avoids the entire MSRV chain from `cargo install`.
+# Trunk finds it in PATH and uses it instead of downloading its own version.
+RUN curl -fsSL \
+    "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.121/wasm-bindgen-0.2.121-x86_64-unknown-linux-musl.tar.gz" \
+    | tar xz --strip-components=1 -C /usr/local/bin/ \
+    "wasm-bindgen-0.2.121-x86_64-unknown-linux-musl/wasm-bindgen"
 
 WORKDIR /app
 
