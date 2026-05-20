@@ -1,4 +1,1 @@
 [target.wasm32-unknown-unknown]
-# Disable reference-types to prevent wasm-bindgen CLI "failed to find
-# intrinsics to enable clone_ref function" error with Rust 1.82+
-rustflags = ["-C", "target-feature=-reference-types"]
