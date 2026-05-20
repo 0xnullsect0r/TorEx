@@ -1,0 +1,5 @@
+# Exclude build artifacts — prevents local target/ dirs from being copied
+# into the Docker image, which would cause cargo to skip recompilation and
+# use stale WASM binaries that break wasm-bindgen-cli.
+**/target
+**/.git

@@ -1,7 +1,8 @@
 # Stage 1: Build Leptos/WASM frontend with trunk
-# Use rust:1.88 — the release-concurrent stable with wasm-bindgen 0.2.121 (released 2026-05-07).
-# Using a newer Rust (e.g. rust:1) triggered clone_ref errors in wasm-bindgen-cli processing.
-FROM rust:1.88 AS builder
+# Use rust:1 (latest stable). wasm32-unknown-unknown exposes reference-types in
+# CARGO_CFG_TARGET_FEATURE since Rust 1.84, so wasm-bindgen 0.2.121 sets wbg_reference_types
+# correctly and __externref_table_alloc is included in the WASM output.
+FROM rust:1 AS builder
 
 RUN rustup target add wasm32-unknown-unknown
 RUN curl -fsSL \

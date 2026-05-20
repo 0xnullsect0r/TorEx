@@ -1,6 +1,3 @@
 [toolchain]
-# Pinned to 1.88 because wasm-bindgen-cli 0.2.121 (in Cargo.lock) requires rustc ≥1.88
-# (its dependency time@0.3.47 has MSRV 1.88.0).
-# Update this pin together with wasm-bindgen when upgrading the Rust toolchain.
-channel = "1.88"
+channel = "stable"
 targets = ["wasm32-unknown-unknown"]
