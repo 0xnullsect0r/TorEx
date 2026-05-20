@@ -1,7 +1,7 @@
 [toolchain]
-# Pinned to 1.82 because wasm-bindgen 0.2.121 (in Cargo.lock) handles the
-# reference-types intrinsics emitted by Rust 1.82. Rust 1.83+ changed those
-# intrinsics, causing wasm-bindgen-cli to fail with a "clone_ref" build error.
+# Pinned to 1.86 because wasm-bindgen-cli 0.2.121 (in Cargo.lock) requires rustc 1.86
+# to compile. Using rust:1.86 in the Docker builder ensures the CLI and the compiled
+# WASM are both from the same toolchain generation, avoiding the "clone_ref" error.
 # Update this pin together with wasm-bindgen when upgrading the Rust toolchain.
-channel = "1.82"
+channel = "1.86"
 targets = ["wasm32-unknown-unknown"]
