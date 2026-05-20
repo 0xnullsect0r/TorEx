@@ -6,6 +6,12 @@ RUN curl -fsSL \
     https://github.com/trunk-rs/trunk/releases/download/v0.21.14/trunk-x86_64-unknown-linux-gnu.tar.gz \
     | tar xz -C /usr/local/bin/
 
+# Install wasm-bindgen-cli exactly matching the crate version in Cargo.lock (0.2.121).
+# Trunk will find this in PATH and use it instead of any bundled/downloaded version.
+# With CLI and crate both at 0.2.121, reference-types are handled correctly and the
+# -C target-feature=-reference-types flag is NOT needed (and was causing runtime crashes).
+RUN cargo install wasm-bindgen-cli --version 0.2.121 --locked
+
 WORKDIR /app
 
 # Cache dependencies (dummy build first)

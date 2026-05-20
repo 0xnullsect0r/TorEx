@@ -1,5 +1,5 @@
-[target.wasm32-unknown-unknown]
-# wasm-bindgen 0.2.121 CLI fails with "failed to find intrinsics to enable
-# clone_ref function" on Rust 1.82+ unless reference-types are disabled here.
-# The CSP (not this flag) was the cause of the blank page.
-rustflags = ["-C", "target-feature=-reference-types"]
+# No rustflags needed for wasm32-unknown-unknown.
+# wasm-bindgen-cli 0.2.121 (installed in nginx/Dockerfile) handles Rust 1.82+
+# reference-types correctly. The old -C target-feature=-reference-types flag
+# was disabling reference-types, which caused the JS glue to crash at runtime
+# (__wbindgen_externref_table_dealloc export missing) → blank/black page.

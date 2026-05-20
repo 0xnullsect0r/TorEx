@@ -49,6 +49,8 @@ hmac          = "0.12"
 sha2          = "0.10"
 blake2        = "0.10"
 
+console_error_panic_hook = "0.1"
+
 [profile.release]
 opt-level     = "s"
 lto           = true
