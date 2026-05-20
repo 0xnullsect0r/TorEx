@@ -9,6 +9,103 @@
   <link data-trunk rel="rust" href="Cargo.toml"/>
 </head>
 <body>
+  <noscript>
+    <style>
+      body { margin: 0; background: #0d0d0f; font-family: 'Courier New', monospace; }
+      .ns-wrap {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        box-sizing: border-box;
+        text-align: center;
+        color: #e2e8f0;
+      }
+      .ns-logo { margin-bottom: 1.5rem; }
+      .ns-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #7c6af7;
+        letter-spacing: 0.08em;
+        margin: 0 0 0.5rem;
+      }
+      .ns-subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        margin: 0 0 2.5rem;
+      }
+      .ns-card {
+        background: #16171a;
+        border: 1px solid #2a2d35;
+        border-radius: 12px;
+        padding: 2rem 2.5rem;
+        max-width: 560px;
+        line-height: 1.7;
+      }
+      .ns-card p { margin: 0 0 1rem; color: #cbd5e1; font-size: 0.95rem; }
+      .ns-card p:last-child { margin: 0; }
+      .ns-link {
+        color: #7c6af7;
+        word-break: break-all;
+        text-decoration: none;
+        border-bottom: 1px solid #7c6af733;
+      }
+      .ns-link:hover { border-bottom-color: #7c6af7; }
+      .ns-badge {
+        display: inline-block;
+        background: #1e1b4b;
+        color: #a78bfa;
+        border: 1px solid #3730a3;
+        border-radius: 6px;
+        padding: 0.2em 0.6em;
+        font-size: 0.8rem;
+        margin-top: 1.5rem;
+        letter-spacing: 0.05em;
+      }
+    </style>
+    <div class="ns-wrap">
+      <div class="ns-logo">
+        <!-- TorEx onion logo -->
+        <svg width="90" height="90" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="45" cy="45" r="44" stroke="#7c6af7" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.4"/>
+          <circle cx="45" cy="45" r="34" stroke="#7c6af7" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.6"/>
+          <circle cx="45" cy="45" r="24" stroke="#7c6af7" stroke-width="1.5" opacity="0.8"/>
+          <circle cx="45" cy="45" r="14" fill="#7c6af7" opacity="0.9"/>
+          <text x="45" y="50" text-anchor="middle" font-family="Courier New, monospace" font-weight="700"
+                font-size="12" fill="#ffffff">TX</text>
+        </svg>
+      </div>
+      <h1 class="ns-title">TorEx</h1>
+      <p class="ns-subtitle">Privacy-First USDT Exchange</p>
+      <div class="ns-card">
+        <p>⚠️ <strong>This website requires JavaScript to run.</strong></p>
+        <p>
+          We understand that keeping JavaScript disabled is the standard advice
+          for Tor Browser — and it is good advice for most sites. TorEx is an
+          exception: the entire application runs as a WebAssembly binary
+          compiled from Rust, with no third-party scripts, no trackers, no
+          analytics, and no external requests of any kind.
+        </p>
+        <p>
+          You can audit every line of code before enabling JS:
+          <br/>
+          <a class="ns-link" href="https://github.com/0xnullsect0r/TorEx">
+            https://github.com/0xnullsect0r/TorEx
+          </a>
+        </p>
+        <p>
+          Once you are satisfied, set the Tor Browser Security Level to
+          <strong>Standard</strong> or enable JavaScript for this .onion
+          address and reload the page.
+        </p>
+        <span class="ns-badge">100% Rust · Open Source · Tor-Only</span>
+      </div>
+    </div>
+  </noscript>
   <div id="root"></div>
 </body>
 </html>
