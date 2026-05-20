@@ -1,5 +1,9 @@
 # Stage 1: Build Leptos/WASM frontend with trunk
-FROM rust:1 AS builder
+# Pinned to rust:1.82 because wasm-bindgen 0.2.121 handles the reference-types
+# intrinsics emitted by Rust 1.82. Newer Rust (1.83+) changed those intrinsics in
+# a way that causes wasm-bindgen-cli 0.2.121 to fail with "failed to find intrinsics
+# to enable clone_ref function". rust:1.82 keeps the whole toolchain consistent.
+FROM rust:1.82 AS builder
 
 RUN rustup target add wasm32-unknown-unknown
 RUN curl -fsSL \

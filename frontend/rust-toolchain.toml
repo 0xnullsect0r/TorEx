@@ -1,0 +1,7 @@
+[toolchain]
+# Pinned to 1.82 because wasm-bindgen 0.2.121 (in Cargo.lock) handles the
+# reference-types intrinsics emitted by Rust 1.82. Rust 1.83+ changed those
+# intrinsics, causing wasm-bindgen-cli to fail with a "clone_ref" build error.
+# Update this pin together with wasm-bindgen when upgrading the Rust toolchain.
+channel = "1.82"
+targets = ["wasm32-unknown-unknown"]
