@@ -19,14 +19,17 @@ RUN curl -fsSL \
 
 WORKDIR /app
 
-# Cache dependencies (dummy build first)
+# Cache dependencies (dummy build first).
+# After building we delete the dummy binary so the real build in the next step
+# cannot reuse a stale WASM from the Docker layer cache — it must recompile.
 COPY frontend/.cargo/ .cargo/
 COPY frontend/Cargo.toml frontend/Cargo.lock* ./
 RUN mkdir src && echo 'fn main(){}' > src/main.rs \
     && cargo build --release --target wasm32-unknown-unknown 2>/dev/null || true \
-    && rm -rf src
+    && rm -rf src \
+    && find target/wasm32-unknown-unknown -name "torex-frontend*" -delete 2>/dev/null || true
 
-# Build the actual app
+# Build the actual app (.dockerignore excludes target/ so no stale artifacts)
 COPY frontend/ .
 RUN trunk build --release
 
