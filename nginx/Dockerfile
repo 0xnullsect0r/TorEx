@@ -1,8 +1,7 @@
 # Stage 1: Build Leptos/WASM frontend with trunk
-# Pinned to rust:1.86 because wasm-bindgen-cli 0.2.121 (matching Cargo.lock) requires
-# rustc 1.86 to compile. The wasm-bindgen version tracks the Rust version it was
-# designed for — keeping them in sync avoids the "clone_ref" reference-types error.
-FROM rust:1.86 AS builder
+# Pinned to rust:1.88 — wasm-bindgen-cli 0.2.121 (matching Cargo.lock) requires
+# rustc ≥1.88 (its dependency time@0.3.47 has MSRV 1.88.0).
+FROM rust:1.88 AS builder
 
 RUN rustup target add wasm32-unknown-unknown
 RUN curl -fsSL \
@@ -11,8 +10,7 @@ RUN curl -fsSL \
 
 # Install wasm-bindgen-cli exactly matching the crate version in Cargo.lock (0.2.121).
 # Trunk will find this in PATH and use it instead of any bundled/downloaded version.
-# With CLI and crate both at 0.2.121, reference-types are handled correctly and the
-# -C target-feature=-reference-types flag is NOT needed (and was causing runtime crashes).
+# Requires rust ≥1.88 (wasm-bindgen-cli's dep time@0.3.47 has MSRV 1.88.0).
 RUN cargo install wasm-bindgen-cli --version 0.2.121 --locked
 
 WORKDIR /app
