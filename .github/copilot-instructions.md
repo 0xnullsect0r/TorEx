@@ -93,7 +93,7 @@ tor daemon (:9050) ── HiddenServicePort 80 ──► nginx (:80)
 
 **SQLX_OFFLINE=true for Docker builds.** The Dockerfile sets `SQLX_OFFLINE=true` so sqlx compile-time query checks are skipped. For dev, run `cargo sqlx prepare` after schema changes.
 
-**wasm-bindgen 0.2.121 requires reference-types ENABLED.** Do NOT add `RUSTFLAGS="-C target-feature=-reference-types"` anywhere — it will cause `__wbindgen_externref_table_dealloc` linker errors.
+**wasm-bindgen 0.2.121 + Rust 1.82+ requires `-C target-feature=-reference-types`.** The flag is set in `frontend/.cargo/config.toml`. Without it, wasm-bindgen CLI fails with "failed to find intrinsics to enable clone_ref function". Do NOT remove this flag.
 
 **No external service calls from the frontend.** This is Tor — no Google Fonts, no hCaptcha, no analytics, no CDNs. Everything must be self-hosted or omitted. ⚠️ The nginx Content-Security-Policy still references `fonts.googleapis.com` — this needs to be removed.
 
